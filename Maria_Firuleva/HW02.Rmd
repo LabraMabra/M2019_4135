@@ -1,0 +1,117 @@
+---
+title: "HW01"
+author: "Maria Firuleva"
+date: '10/10/2019 г '
+output: html_document
+---
+
+
+## Load libraries
+
+```{r libraries, message=F}
+library(dplyr)
+library(tidyverse)
+```
+
+## Function
+
+There are several arguments for *dataSubset* function:
+
+  * **data**: input dataframe, required argument;
+  
+  * **colNames**: vector of column names which you want to save in result dataframe. It is first step of dataframe filtration and, by default, it includes all column names in input dataframe;
+  
+  * **colIndexes**: vector of column indexes which you want to save in result dataframe *after* filtering using colNames; make sure there is no conflict between these two steps; by default, it includes all column indexes in input dataframe;
+  
+  * **colLogicVector**: logical vector for column subsetting which you want to save in result dataframe; this parameter will be used after filtration using **colNames** and **colIndexes**; by default, it parameter is *NULL* and, after columns filtration using **colNames** and **colIndexes**, it will be redefined as vector with only *TRUE* values;
+  
+  * **rowNames**: vector of row names which you want to save in result dataframe; by default, it includes all row names in input dataframe;
+  
+  * **rowIndexes**: vector of row indexes which you want to save in result dataframe; by default, it includes all row indexes in input dataframe.
+  
+
+Function output is a named list with several elements:
+
+  * **Data**: filtered input dataframe;
+  
+  * **columnSums**: named numeric vector contains column sums for numeric column in filtered dataframe, NA will be removed;
+  
+  * **columnSDs**: named numeric vector contains column SDs for numeric columnss in filtered dataframe, NA will be removed;
+  
+  * **columnMeans**: named numeric vector contains column means for numeric columns in filtered dataframe, NA will be removed;
+  
+  * **freqTable**: frequency table for all non-numeric columns in filtered dataframe.
+
+
+```{r function}
+dataSubset <- function(data, colNames = colnames(data), colIndexes = c(1:ncol(data)), colLogicVector = NULL, rowNames = rownames(data), rowIndexes = c(1:nrow(data))) {
+  data <- select(data, colNames)
+  data <- select(data, colIndexes)
+  if (is.null(colLogicVector)) {
+    colLogicVector <- c(rep(T, ncol(data)))
+  }
+  data <- select(data, which(colLogicVector))
+  data <- data %>% rownames_to_column("target") %>% filter(rownames(data) %in% rowNames) %>% remove_rownames %>% column_to_rownames(var="target")
+  data <- data %>% rownames_to_column("target") %>% slice(rowIndexes) %>% remove_rownames %>% column_to_rownames(var="target")
+  columnSums <- colSums(select_if(data, is.numeric), na.rm = T)
+  columnMeans <- colMeans(select_if(data, is.numeric), na.rm = T)
+  columnSDs <- apply((select_if(data, is.numeric)), 2, sd, na.rm = T)
+  freqTable <- apply(select_if(data, negate(is.numeric)), 2, table)
+  data <- list(data, columnSums, columnSDs, columnMeans, freqTable)
+  names(data) <- c("Data", "columnSums", "columnSDs", "columnMeans", "freqTable")
+  data
+}
+```
+
+Let's look on some examples.
+
+## mtcars
+
+```{r mtcars}
+result <- dataSubset(mtcars, colNames = c("disp", "hp", "cyl"),  colIndexes = c(1:3), rowNames = c("Mazda RX4", "Merc 450SE", "Fiat 128", "Ford Pantera L"), rowIndexes = c(1:2))
+str(result$Data)
+result$columnSums
+result$columnSDs
+result$columnMeans
+result$freqTable
+```
+
+In this case, there is an error because we want to save column 4, but our prefiltered dataset contains only 3 columns: disp, hp and cyl.
+
+```{r mtcars_error, error=TRUE}
+result <- dataSubset(mtcars, colNames = c("disp", "hp", "cyl"),  colIndexes = c(1:4), rowNames = c("Mazda RX4", "Merc 450SE", "Fiat 128", "Ford Pantera L"), rowIndexes = c(1:2))
+```
+
+
+
+## iris
+
+```{r iris}
+result <- dataSubset(iris, colIndexes = c(1:3, 5), rowIndexes = c(1:2, 89:95, 110:130))
+str(result$Data)
+result$columnSums
+result$columnSDs
+result$columnMeans
+result$freqTable
+```
+
+What about NA in factor variable?
+
+```{r iris_with_na}
+iris$Species[1] <- NA
+result <- dataSubset(iris, colIndexes = c(1:3, 5), rowIndexes = c(1:2, 89:95, 110:130))
+result$freqTable
+```
+
+
+## airquality
+
+```{r airquality}
+result <- dataSubset(airquality, rowIndexes = c(1:25), colLogicVector = c(T, F, T, F))
+str(result$Data)
+result$columnSums
+result$columnSDs
+result$columnMeans
+result$freqTable
+```
+
