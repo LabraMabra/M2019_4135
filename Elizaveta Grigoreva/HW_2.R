@@ -24,7 +24,7 @@ subsetting  <- function(data2, x, y){
     } else {
 #If it non-numeric data write it into table      
       result[[elements]] <- table(columns_for_check, dnn = NULL)
-#Closeclose function return result as a list and close finally      
+#Closeclose function return result as a list and close finaly      
     }
   }
  return(result)
