@@ -1,16 +1,16 @@
 data_processing <- function(data_frame, row_selection, column_selection) {
-  subset <- data_frame[row_selection, column_selection, drop=FALSE]
-  processed_data <- list(subset)
+  subset <- data_frame[row_selection, column_selection, drop = FALSE]
+  calculations <- list()
 
   for (column in subset) {
     if (is.numeric(column)) {
-      processed_data <- c(processed_data, sum(column))
+      calculations <- c(calculations, sum(column))
     } else {
-      processed_data <- c(processed_data, table(column))
+      calculations <- c(calculations, table(column))
     }
   }
   
-  return(processed_data)
+  return(list(subset, calculations))
 }
 
 print(data_processing(iris, 1:3, 1:2))
