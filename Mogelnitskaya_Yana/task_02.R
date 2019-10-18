@@ -1,17 +1,16 @@
 hw <- function(xfull,row_criteria, col_criteria) {
     ls <- list()
-    xf <- xfull[row_criteria, col_criteria]
+    xf <- subset(xfull, select = c(col_criteria))[row_criteria, ,drop=FALSE]
     ls[[1]] <- xf
     n <-c("Subsetted data")
-    hw()for (i in 1:ncol(xf)) {
+    for (i in 1:ncol(xf)) {
         if (is.numeric(xf[[i]][1])) {
             ls[[i+1]] <- sum(xf[i])
             n <- c(n,toString(c(names(xf[i])," sum")))}
-    else {
-          ls[[i+1]] <- summary(xf[i])
-          n <- c(n, toString(c(names(xf[i])," frequency table")))}
+        else {
+            ls[[i+1]] <- summary(xf[i])
+            n <- c(n, toString(c(names(xf[i])," frequency table")))}
     }
     names(ls) <- n
     return(ls)
-    }
-
+}
