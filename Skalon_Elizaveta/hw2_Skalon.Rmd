@@ -1,0 +1,91 @@
+---
+title: "task2_R_Skalon"
+author: "Lisa"
+date: "October 10, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo=FALSE}
+library(knitr)
+```
+
+## Homework task 2
+
+Let s create a function, which takes data frame, row selection and column selection as arguments, subsets data according to the given selection, does some basic computations such as mean value or frequence table for each column and returns all the data as a list.
+
+```{r}
+selection <- function(df, x1, x2){
+  selected_df <- df[x1, x2]
+  mean_list <- list()
+  freq_list <- list()
+  # for 1-column situations:
+  if (is.null(ncol(selected_df))==TRUE){
+    selected_df <-data.frame(selected_df)
+  }
+  for (i in 1:ncol(selected_df)){
+    if (is.numeric(selected_df[,i])==TRUE){
+      mean_list[[names(df)[i]]] <- mean(selected_df[,i])
+      i <- i+1
+    } 
+    else {
+      freq_list[[names(df)[i]]] <- table(selected_df[,i])
+      i <- i+1
+    }
+  }
+  returned <- list("df" = selected_df, "mean" = mean_list, "frequency" = freq_list)
+  return(returned)
+}
+
+```
+
+Now we will apply this function **selection** on the ***iris*** data
+```{r iris}
+df <- iris
+index_row <- 1:10
+index_col <- 1:5
+out_iris<- selection(df, index_row, index_col)
+```
+Our results are stored in the list called **out_iris**. Let`s see, what is inside:
+
+1. subset according to the given selection
+```{r}
+out_iris$df
+```
+
+2. mean values for each numeric column
+```{r}
+out_iris$mean
+```
+
+3. frequency tables for each non-numerical column
+```{r}
+out_iris$frequency
+```
+
+Let`s try another dataset ***Theoph***
+```{r Theoph}
+df <- Theoph
+index_row <- 1:20
+index_col <- 1:4
+out_Theoph <- selection(df, index_row, index_col)
+```
+1. subset according to the given selection
+```{r}
+out_Theoph$df
+```
+
+2. mean values for each numeric column
+```{r}
+out_Theoph$mean
+```
+
+3. frequency tables for each non-numerical column
+```{r}
+out_Theoph$frequency
+```
+
+
