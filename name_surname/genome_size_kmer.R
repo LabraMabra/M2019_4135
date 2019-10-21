@@ -1,0 +1,11 @@
+getwd()
+setwd("/home/aleksandar/Applied_Bioinfo_3")
+getwd()
+spec1_25 <- read.table("mer_counts_31.histo")
+print(spec1_25)
+plot(spec1_25[5:150,],type="l")
+points(spec1_25[5:150,])
+sum(as.numeric(spec1_25[5:817,1]*spec1_25[5:817,2]))
+peak <- max(spec1_25[5:817,2])
+sum(as.numeric(spec1_25[5:817,1]*spec1_25[5:817,2])/62)
+
