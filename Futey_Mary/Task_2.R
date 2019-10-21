@@ -37,26 +37,26 @@ foo(iris, 1:5, 1:5)
 
 
 
-foo_2 <- function(data, rows, cols) {
-  res <- list()
+# foo_2 <- function(data, rows, cols) {
+#   res <- list()
   
-  sub_set <- data[rows, cols]
-  res$subset <- sub_set
+#   sub_set <- data[rows, cols]
+#   res$subset <- sub_set
   
-  for (col_name in names(sub_set)) {
-    col <- sub_set[[col_name]]
-    type_check <- is.character(col)
+#   for (col_name in names(sub_set)) {
+#     col <- sub_set[[col_name]]
+#     type_check <- is.character(col)
     
-    if (type_check) {
-      res[[col_name]] <- table(col, dnn = NULL)
-    } else {
-      res[[col_name]] <- sum(col)
-    }
-  }
-  res
-}
+#     if (type_check) {
+#       res[[col_name]] <- table(col, dnn = NULL)
+#     } else {
+#       res[[col_name]] <- sum(col)
+#     }
+#   }
+#   res
+# }
 
-foo_2(airquality, 1:2, 1:5)
+# foo_2(airquality, 1:2, 1:5)
 
 
   
