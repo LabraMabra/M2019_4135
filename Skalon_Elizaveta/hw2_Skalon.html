@@ -129,26 +129,32 @@ $(document).ready(function () {
 <div id="homework-task-2" class="section level2">
 <h2>Homework task 2</h2>
 <p>Let s create a function, which takes data frame, row selection and column selection as arguments, subsets data according to the given selection, does some basic computations such as mean value or frequence table for each column and returns all the data as a list.</p>
-<pre class="r"><code>func &lt;- function(df, x1, y1, x2, y2){
-  new_df &lt;- df[x1:y1, x2:y2]
+<pre class="r"><code>selection &lt;- function(df, x1, x2){
+  selected_df &lt;- df[x1, x2]
   mean_list &lt;- list()
   freq_list &lt;- list()
-  for (i in 1:ncol(new_df)){
-    if (is.numeric(new_df[,i])==TRUE){
-      mean_list[[names(df)[i]]] &lt;- mean(new_df[,i])
+  # for 1-column situations:
+  if (is.null(ncol(selected_df))==TRUE){
+    selected_df &lt;-data.frame(selected_df)
+  }
+  for (i in 1:ncol(selected_df)){
+    if (is.numeric(selected_df[,i])==TRUE){
+      mean_list[[names(df)[i]]] &lt;- mean(selected_df[,i])
       i &lt;- i+1
     } 
     else {
-      freq_list[[names(df)[i]]] &lt;- table(new_df[,i])
+      freq_list[[names(df)[i]]] &lt;- table(selected_df[,i])
       i &lt;- i+1
     }
   }
-  ret &lt;- list(&quot;df&quot; = new_df, &quot;mean&quot; = mean_list, &quot;frequency&quot; = freq_list)
-  return(ret)
+  returned &lt;- list(&quot;df&quot; = selected_df, &quot;mean&quot; = mean_list, &quot;frequency&quot; = freq_list)
+  return(returned)
 }</code></pre>
-<p>Now we will apply this function <strong>func</strong> on the <strong><em>iris</em></strong> data</p>
+<p>Now we will apply this function <strong>selection</strong> on the <strong><em>iris</em></strong> data</p>
 <pre class="r"><code>df &lt;- iris
-out_iris&lt;- func(df, 1, 10, 1, 5)</code></pre>
+index_row &lt;- 1:10
+index_col &lt;- 1:5
+out_iris&lt;- selection(df, index_row, index_col)</code></pre>
 <p>Our results are stored in the list called <strong>out_iris</strong>. Let`s see, what is inside:</p>
 <ol style="list-style-type: decimal">
 <li>subset according to the given selection</li>
@@ -190,7 +196,9 @@ out_iris&lt;- func(df, 1, 10, 1, 5)</code></pre>
 ##         10          0          0</code></pre>
 <p>Let`s try another dataset <strong><em>Theoph</em></strong></p>
 <pre class="r"><code>df &lt;- Theoph
-out_Theoph &lt;- func(df, 1, 20, 1, 4)</code></pre>
+index_row &lt;- 1:20
+index_col &lt;- 1:4
+out_Theoph &lt;- selection(df, index_row, index_col)</code></pre>
 <ol style="list-style-type: decimal">
 <li>subset according to the given selection</li>
 </ol>

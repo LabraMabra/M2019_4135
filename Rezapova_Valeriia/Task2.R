@@ -1,25 +1,23 @@
 f1 <- function(df,r,kol){
-  list1 <- list()
-  list2 <- list()
-  v_sum <- c()
-  v_mean <- c()
-  data_base <- df
-  sub_data_base <- data_base[r,kol]
-  list1 <- list(as.matrix(sub_data_base))
+  sub_data_base <- subset(df, select=c(kol))[r,,drop=FALSE] #changed cause ncol(mtcars[10,10])=NULL
+  list1 <- list(subset=sub_data_base)
   for (i in (1:ncol(sub_data_base))) {
-    if(is.numeric(sub_data_base[,i])==TRUE){
-      v_sum[i] <- sum(sub_data_base[,i])
-      v_mean[i] <- mean(sub_data_base[,i])}
+    if(is.numeric(sub_data_base[,i])){
+      list1[[length(list1)+1]] <- list(sum=sum(sub_data_base[,i]),mean=mean(sub_data_base[,i])) #I'm not sure
+      }
     else{
-      list2 <- append(list2,list(table(sub_data_base[,i])))
+      list1[[length(list1)+1]] <- list(table=table(sub_data_base[,i]))
     }
   }
-  list1 <- append(list1,list(t(as.matrix(v_sum))))
-  list1 <- append(list1,list(t(as.matrix(v_mean))))
-  list1 <- append(list1,list2)
-  list1 <- list1[lengths(list1)>0L]
+  
   return(list1)
 }
 f1(mtcars,c("Mazda RX4","Mazda RX4 Wag"),c("disp","hp"))
 f1(iris,c(4,5),c(4,5))
 f1(airquality,c(1,2,3),c(TRUE,F,F,T,T,F))
+f1(mtcars,10,10)
+data <- mtcars
+data$gear <- as.factor(data$gear)
+f1(data,1:10,10:11) #here we have gear as factor and sum with mean cannot be applied on factors,
+#so we get table. I'm not sure that i really have to change something cause else includes factors and characters
+
