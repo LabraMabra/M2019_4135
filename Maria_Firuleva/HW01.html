@@ -184,11 +184,6 @@ summary {
 </div>
 
 
-<div id="load-libraries" class="section level2">
-<h2>Load libraries</h2>
-<pre class="r"><code>library(dplyr)
-library(tidyverse)</code></pre>
-</div>
 <div id="function" class="section level2">
 <h2>Function</h2>
 <p>There are several arguments for <em>dataSubset</em> function:</p>
@@ -198,7 +193,7 @@ library(tidyverse)</code></pre>
 <li><p><strong>colIndexes</strong>: vector of column indexes which you want to save in result dataframe <em>after</em> filtering using colNames; make sure there is no conflict between these two steps; by default, it includes all column indexes in input dataframe;</p></li>
 <li><p><strong>colLogicVector</strong>: logical vector for column subsetting which you want to save in result dataframe; this parameter will be used after filtration using <strong>colNames</strong> and <strong>colIndexes</strong>; by default, it parameter is <em>NULL</em> and, after columns filtration using <strong>colNames</strong> and <strong>colIndexes</strong>, it will be redefined as vector with only <em>TRUE</em> values;</p></li>
 <li><p><strong>rowNames</strong>: vector of row names which you want to save in result dataframe; by default, it includes all row names in input dataframe;</p></li>
-<li><p><strong>rowIndexes</strong>: vector of row indexes which you want to save in result dataframe; by default, it includes all row indexes in input dataframe.</p></li>
+<li><p><strong>rowIndexes</strong>: vector of row indexes which you want to save in result dataframe <em>after</em> filtering using rowNames; make sure there is no conflict between these two steps; by default, it includes all row indexes in input dataframe.</p></li>
 </ul>
 <p>Function output is a named list with several elements:</p>
 <ul>
@@ -209,14 +204,23 @@ library(tidyverse)</code></pre>
 <li><p><strong>freqTable</strong>: frequency table for all non-numeric columns in filtered dataframe.</p></li>
 </ul>
 <pre class="r"><code>dataSubset &lt;- function(data, colNames = colnames(data), colIndexes = c(1:ncol(data)), colLogicVector = NULL, rowNames = rownames(data), rowIndexes = c(1:nrow(data))) {
-  data &lt;- select(data, colNames)
-  data &lt;- select(data, colIndexes)
+  data &lt;- data[colNames]
+  if (max(colIndexes) &gt; ncol(data)) {
+    stop('You must specify colIndexes after filtering using colNames; make sure there is no conflict between these arguments.')
+  }
+  data &lt;- data[colIndexes]
   if (is.null(colLogicVector)) {
     colLogicVector &lt;- c(rep(T, ncol(data)))
   }
-  data &lt;- select(data, which(colLogicVector))
-  data &lt;- data %&gt;% rownames_to_column(&quot;target&quot;) %&gt;% filter(rownames(data) %in% rowNames) %&gt;% remove_rownames %&gt;% column_to_rownames(var=&quot;target&quot;)
-  data &lt;- data %&gt;% rownames_to_column(&quot;target&quot;) %&gt;% slice(rowIndexes) %&gt;% remove_rownames %&gt;% column_to_rownames(var=&quot;target&quot;)
+  if (length(colLogicVector) &gt; ncol(data)) {
+    stop('You must specify colLogicVector after filtering using colNames and colIndexes; make sure there is no conflict between these arguments.')
+  }
+  data &lt;- data[which(colLogicVector)]
+  data &lt;- data[rowNames,]
+  if (max(rowIndexes) &gt; nrow(data)) {
+    stop('You must specify rowIndexes after filtering using rowNames; make sure there is no conflict between these arguments.')
+  }
+  data &lt;- data[rowIndexes,]
   columnSums &lt;- list()
   columnMeans &lt;- list()
   columnSDs &lt;- list()
@@ -275,7 +279,7 @@ str(result$Data)</code></pre>
 <pre><code>## list()</code></pre>
 <p>In this case, there is an error because we want to save column 4, but our prefiltered dataset contains only 3 columns: disp, hp and cyl.</p>
 <pre class="r"><code>result &lt;- dataSubset(mtcars, colNames = c(&quot;disp&quot;, &quot;hp&quot;, &quot;cyl&quot;),  colIndexes = c(1:4), rowNames = c(&quot;Mazda RX4&quot;, &quot;Merc 450SE&quot;, &quot;Fiat 128&quot;, &quot;Ford Pantera L&quot;), rowIndexes = c(1:2))</code></pre>
-<pre><code>## Error in inds_combine(.vars, ind_list): Position must be between 0 and n</code></pre>
+<pre><code>## Error in dataSubset(mtcars, colNames = c(&quot;disp&quot;, &quot;hp&quot;, &quot;cyl&quot;), colIndexes = c(1:4), : You must specify colIndexes after filtering using colNames; make sure there is no conflict between these arguments.</code></pre>
 </div>
 <div id="iris" class="section level2">
 <h2>iris</h2>
