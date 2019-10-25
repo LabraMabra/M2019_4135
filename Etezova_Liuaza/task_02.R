@@ -1,13 +1,15 @@
 data_processing <- function(data_frame, row_selection, column_selection) {
   subset <- data_frame[row_selection, column_selection, drop = FALSE]
   calculations <- list()
+  i <- 1
 
   for (column in subset) {
     if (is.numeric(column)) {
-      calculations <- c(calculations, sum(column))
+      calculations[[i]] <- sum(column)
     } else {
-      calculations <- c(calculations, table(column))
+      calculations[[i]] <- table(column)
     }
+    i <- i + 1
   }
   
   return(list(subset, calculations))
