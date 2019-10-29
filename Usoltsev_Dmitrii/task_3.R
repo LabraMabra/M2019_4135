@@ -38,6 +38,7 @@ subs <- function(data, row_selector, column_selector, split_selector) {
   sub <- subset(data, select = c(column_selector))[row_selector, ,drop=FALSE]
   sub1 <- subset(data, select = c(split_selector))[row_selector,]
   splitter <- split(sub, sub1, drop =TRUE)
+  result <- lapply(splitter, sap_s)
   M <- list(sub)
   M[[length(M)+1]] <-list(mean = lapply(splitter, sap_m), sum = lapply(splitter, sap_s), 
                           sd = lapply(splitter, sap_sd))
