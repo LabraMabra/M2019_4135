@@ -1,4 +1,4 @@
-f <- function(x) 
+            f <- function(x) 
     {
     if (is.numeric(x)) {
             g <- sum(x)}
