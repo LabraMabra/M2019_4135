@@ -4,19 +4,12 @@ data("iris")
 summary(iris)
 
 
-# more specific names
-data_f <- iris
-rows_num <- 1:5
-cols_num <- 1:2
-cols_names <- c("Sepal.Length", "Petal.Length", "Species")
 
-data_f[rows_num, cols_names]
 
 
 foo <- function(data, rows, cols) {
   res <- list()
-
-  sub_set <- data[rows, cols]
+  sub_set <- data.frame(data[rows, cols])
   res$subset <- sub_set
 
   for (col_name in names(sub_set)) {
@@ -32,7 +25,9 @@ foo <- function(data, rows, cols) {
   res
 }
 
+
 foo(iris, 1:5, 1:5)
+foo(iris, 1:5, 1)
 
 
 
