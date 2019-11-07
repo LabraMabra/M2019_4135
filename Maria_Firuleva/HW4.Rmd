@@ -1,0 +1,108 @@
+---
+title: 'Weather: data clining'
+author: "Maria Firuleva"
+date: '7 November 2019 г '
+output: html_document
+---
+
+
+## HW4: weather
+
+# Load libraries and define functions
+
+```{r loading, message=F}
+library(data.table)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(Hmisc)
+```
+
+
+```{r functions}
+getMode <- function(v) {
+  uniqv <- unique(v)
+  uniqv[which.max(tabulate(match(v, uniqv)))]
+}
+
+getNApercentage <- function(data) {
+  data <- as.data.frame(colMeans(is.na(data)) * 100)
+  data$measure <- rownames(data)
+  colnames(data)[1] <- 'NA_percentage'
+  ggplot(data %>% filter(NA_percentage > 10), aes(x=measure, weight=NA_percentage)) + geom_bar(color="black", fill="white")+labs(x = "Measure", y = "NA percentage", title="Measurements with NA percentage >= 10%")+theme_classic()+ theme(aspect.ratio = 1)
+}
+
+removeOutliers <- function(x){
+    q <- quantile(x, 0.25) + quantile(x, 0.75)
+    return(x[abs(x - q/2) <= 2*IQR(x)])
+}
+
+
+replaceNA <- function(x, treshold=1){
+  totalUniqValues <- length(unique(na.omit(x)))
+  outNumber <- totalUniqValues - length(unique(removeOutliers(na.omit(x))))
+  ifelse(outNumber >= treshold, x <- replace(x, is.na(x), mean(x, na.rm = TRUE)), x <- replace(x, is.na(x), median(x, na.rm = TRUE))) 
+  x
+}
+
+
+```
+
+# Load data, reshape it
+
+```{r reshaping}
+weather <- readRDS("~/master/R/Lessons/weather.rds")
+weather <- select(weather, -X)
+weather <- unite(weather, period, year, month)
+weather <- melt(setDT(weather), 
+         measure.vars = patterns("^X"), 
+         variable.name = "Day")
+
+weather$Day <- gsub('X', '', weather$Day)
+weather <- spread(weather, measure, value)
+weather <- as.data.frame(weather)
+weather$period <- as.factor(weather$period)
+weather$Events <- as.factor(weather$Events)
+weather[,c(2:3, 5:ncol(weather))] <- apply(weather[,c(2:3,5:ncol(weather))], 2, as.numeric)
+tbl_df(weather)
+```
+
+
+# Test whether data contains columns with NA >= 10% or not
+
+```{r estimateNA}
+getNApercentage(weather)
+```
+
+There are two numerical columns with NA percentages more than 10%.
+
+# Visualize distributions of all numeric continous columns (without Day column)
+
+```{r plots}
+hist.data.frame(na.omit(select_if(weather, is.numeric))[2:5])
+hist.data.frame(na.omit(select_if(weather, is.numeric))[6:10])
+hist.data.frame(na.omit(select_if(weather, is.numeric))[11:15])
+hist.data.frame(na.omit(select_if(weather, is.numeric))[16:20])
+hist.data.frame(na.omit(select_if(weather, is.numeric))[21:22])
+```
+
+
+We can replace missing values using mean or median (there are another approaches to replace NAs, but in this homework I will use only these two options for continous data).
+
+If column contains outliers, then mean is not the appropriate choise, and median will be more representative.
+
+For each numerical column, excluding Day, I check whether column contains >= 1 outlier or not. If column contains >= 1 outlier, NA values are replaced by median, in other case NA values are replaced by mean.
+
+Outliers checking is based on quantile definition and finding observations which are not present in 2*IQR interval for specific column.
+
+```{r}
+weather <- select(weather, period, Day, Events) %>% cbind(select_if(weather, is.numeric) %>% select(-Day) %>% transmute_all(replaceNA))
+tbl_df(weather)
+lapply(weather, function(x) sum(is.na(x)))
+```
+
+Events is a categorical data, and the mode can be used as alternative for NA values
+
+```{r}
+weather$Events <- replace(weather$Events, is.na(weather$Events), getMode(weather$Events))
+```
