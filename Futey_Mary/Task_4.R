@@ -1,8 +1,10 @@
+#libraries used
 library(tidyr)
 library(dplyr)
 library(data.table)
 library(lubridate)
 
+#read file
 weather <- readRDS("~/Desktop/weather.rds")
 
 #gather days to rows 
