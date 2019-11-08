@@ -1,0 +1,17 @@
+ f <- function(data, rows, cols) {
+     sel_data <- subset(data, select=c(cols))[rows, ,drop=FALSE]
+     result <- list(sel_data)
+     for (i in (1:ncol(sel_data))){
+         if(is.numeric(sel_data[,i])){
+             result <- c(result, mean(sel_data[,i]))
+         }
+         else{
+             result[[i+1]] <- (table(sel_data[,i]))
+         }
+     }
+     
+     return(result)
+}
+     f(mtcars,c("Mazda RX4","Mazda RX4 Wag", Hornet 4 Drive),c("disp","hp"))
+     f(airquality,c(2,3,5),c(TRUE,F,F,T,T,F))
+     f(iris,c(1,5),c(1,5))

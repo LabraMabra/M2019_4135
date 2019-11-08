@@ -1,0 +1,10 @@
+f1 <- function(data, rows, cols) {
+sel_data <- subset(data, select=c(cols))[rows, ,drop=FALSE]
+result <- list(sel_data)
+calc <- lapply(data, function(x) if(is.numeric(x)){operation(x)} else table(x))
+
+  result <-c(result,calc)
+
+  return(result)
+
+
