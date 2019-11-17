@@ -1,3 +1,4 @@
+#!/usr/bin/R
 # wheather dataset cleaning
 library("dplyr", lib.loc="~/R/x86_64-pc-linux-gnu-library/3.2")
 library("tidyr", lib.loc="~/R/x86_64-pc-linux-gnu-library/3.2")
