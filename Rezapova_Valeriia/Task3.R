@@ -9,7 +9,7 @@ f1 <- function(kol,fun){
 f2 <- function(df,r,kol, fun, spl){
   sub_data_base <- df[r,kol, drop=FALSE]
   fact <- as.factor(sub_data_base[,spl])
-  splitted <- lapply(split(sub_data_base,spl, drop=FALSE), function(kol){
+  splitted <- lapply(split(sub_data_base,fact, drop=FALSE), function(kol){
     lapply(kol, f1, fun)})
   return(list(sub_data_base,splitted))
 }
