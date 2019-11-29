@@ -1,8 +1,13 @@
 library(tidyr)
-weather2 <- gather(weather, day, value, X1:X31)
-weather2$day <- sapply(weather2$day, function(x) gsub("X", "", x))
-weather2 <- unite(weather2, data, day, month, year, sep = ".")
-weather2$X <- NULL
-weather2 <- spread(weather2, measure, value)
-sum(is.na(weather2))
-weather2 <- weather2[complete.cases(weather2),]
+weather <- readRDS('weather.rds')
+weather <- gather(weather, day, value, X1:X31)
+weather$day <- sapply(weather$day, function(x) gsub("X", "", x))
+weather <- unite(weather, data, day, month, year, sep = "-")
+weather$X <- NULL
+weather <- spread(weather, measure, value)
+weather$data <- as.Date(weather$data)
+sum(is.na(weather))
+weather <- weather[complete.cases(weather),]
+#(for PrecipitationIn, there are “T” values indicating “Trace”, or 0 in number)
+weather$PrecipitationIn[weather$PrecipitationIn %in% "T"] <- "0"
+weather[, !names(weather) %in% c("data", "Events")] <- sapply(weather[, !names(weather) %in% c("data", "Events")], as.numeric)
