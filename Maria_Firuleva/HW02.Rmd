@@ -1,5 +1,5 @@
 ---
-title: "HW02"
+title: "HW01"
 author: "Maria Firuleva"
 date: '10/10/2019 г '
 output: html_document
@@ -20,34 +20,31 @@ There are several arguments for *dataSubset* function:
   
   * **rowNames**: vector of row names which you want to save in result dataframe; by default, it includes all row names in input dataframe;
   
-  * **rowIndexes**: vector of row indexes which you want to save in result dataframe; by default, it includes all row indexes in input dataframe;
-  
-  * **calculations**: vector with combinations of "columnSums", "columnMeans" and "columnSDs" strings or NULL.
+  * **rowIndexes**: vector of row indexes which you want to save in result dataframe *after* filtering using rowNames; make sure there is no conflict between these two steps; by default, it includes all row indexes in input dataframe.
   
 
 Function output is a named list with several elements:
 
   * **Data**: filtered input dataframe;
   
-  * **columnSums**: named numeric vector contains column sums for numeric column in filtered dataframe, NA will be removed (optional, depends on *calculations* argument);
+  * **columnSums**: named numeric vector contains column sums for numeric column in filtered dataframe, NA will be removed;
   
-  * **columnSDs**: named numeric vector contains column SDs for numeric columnss in filtered dataframe, NA will be removed (optional, depends on *calculations* argument);
+  * **columnSDs**: named numeric vector contains column SDs for numeric columnss in filtered dataframe, NA will be removed;
   
-  * **columnMeans**: named numeric vector contains column means for numeric columns in filtered dataframe, NA will be removed (optional, depends on *calculations* argument);
+  * **columnMeans**: named numeric vector contains column means for numeric columns in filtered dataframe, NA will be removed;
   
   * **freqTable**: frequency table for all non-numeric columns in filtered dataframe.
 
 
 ```{r function}
-dataSubset <- function(data, colNames = colnames(data), colIndexes = c(1:ncol(data)), colLogicVector = NULL, rowNames = rownames(data), rowIndexes = c(1:nrow(data)), calculations = c("columnSums", "columnMeans", "columnSDs"), splitted_factor = NULL) {
-  if (!is.null(calculations) & sum(!calculations %in% c("columnSums", "columnMeans", "columnSDs"))) {
-    stop('calculations argument can be a vector with combinations of columnSums, columnMeans and columnSDs strings or NULL. Perhaps you put something unacceptable string in this vector.')
-  }
+library(dplyr)
+dataSubset <- function(data, colNames = colnames(data), colIndexes = c(1:ncol(data)), colLogicVector = NULL, rowNames = rownames(data), rowIndexes = c(1:nrow(data))) {
   data <- data[colNames]
   if (max(colIndexes) > ncol(data)) {
     stop('You must specify colIndexes after filtering using colNames; make sure there is no conflict between these arguments.')
   }
   data <- data[colIndexes]
+  init_colnames <- colnames(data)
   if (is.null(colLogicVector)) {
     colLogicVector <- c(rep(T, ncol(data)))
   }
@@ -55,57 +52,63 @@ dataSubset <- function(data, colNames = colnames(data), colIndexes = c(1:ncol(da
     stop('You must specify colLogicVector after filtering using colNames and colIndexes; make sure there is no conflict between these arguments.')
   }
   data <- data[which(colLogicVector)]
-  data <- data[rowNames,]
+  init_colnames <- colnames(data)
+  data <- data[rowNames,] %>% as.data.frame() %>% magrittr::set_colnames(init_colnames)
   if (max(rowIndexes) > nrow(data)) {
     stop('You must specify rowIndexes after filtering using rowNames; make sure there is no conflict between these arguments.')
   }
-  data <- data[rowIndexes,]
-  non_numeric_data <- data[!sapply(data, is.numeric)]
-  result <- list()
-  result$data <- data
-  if (!is.null(splitted_factor)) {
-    data <- split(data, data[splitted_factor])
-    data <- lapply(data, function(x) x[sapply(x, is.numeric)])
-    if ("columnSums" %in% calculations) {
-      columnSums <- lapply(data, colSums, na.rm = T)
-      result$columnSums <- columnSums
-    }
-    if ("columnMeans" %in% calculations) {
-      columnMeans <- lapply(data, colMeans, na.rm = T)
-      result$columnMeans <- columnMeans
-    }
-    if ("columnSDs" %in% calculations) {
-      columnSDs <- lapply(data, function(x) lapply(x, sd, na.rm = T))
-      result$columnSDs <- columnMeans
-    }
-  } else {
-    data <- lapply(data, function(x) x[sapply(x, is.numeric)])
-    if ("columnSums" %in% calculations) {
-      columnSums <- lapply(data, sum, na.rm = T)
-      result$columnSums <- columnSums
-    }
-    if ("columnMeans" %in% calculations) {
-      columnMeans <- lapply(data, mean, na.rm = T)
-      result$columnMeans <- columnMeans
-    }
-    if ("columnSDs" %in% calculations) {
-      columnSDs <- lapply(data, function(x) lapply(x, sd, na.rm = T))
-      result$columnSDs <- columnMeans
+  data <- data[rowIndexes,] %>% as.data.frame() %>% magrittr::set_colnames(init_colnames)
+  columnSums <- list()
+  columnMeans <- list()
+  columnSDs <- list()
+  freqTable <- list()
+  for (col in seq_along(1:ncol(data))) {
+    if (is.numeric(data[,col])) {
+      columnSDs[[colnames(data)[col]]] <- sd(data[,col], na.rm = T)
+      columnMeans[[colnames(data)[col]]] <- mean(data[,col], na.rm = T)
+      columnSums[[colnames(data)[col]]] <- sum(data[,col], na.rm = T)
+    } else{
+      freqTable[[colnames(data)[col]]] <- c(table(data[,col]))
     }
   }
-  freqTable <- apply(non_numeric_data, 2, table)
-  result$freqTable <- freqTable
-  result
+  data <- list(data, columnSums, columnSDs, columnMeans, freqTable)
+  names(data) <- c("Data", "columnSums", "columnSDs", "columnMeans", "freqTable")
+  data
 }
 ```
 
 Let's look on some examples.
 
+## Nikita's issue
+
+```{r fixed}
+dataSubset(iris, colIndexes = 1, rowIndexes = c(1:12))
+```
+
+## mtcars
+
+```{r mtcars}
+result <- dataSubset(mtcars, colNames = c("disp", "hp", "cyl"),  colIndexes = c(1:3), rowNames = c("Mazda RX4", "Merc 450SE", "Fiat 128", "Ford Pantera L"), rowIndexes = c(1:2))
+str(result$Data)
+result$columnSums
+result$columnSDs
+result$columnMeans
+result$freqTable
+```
+
+In this case, there is an error because we want to save column 4, but our prefiltered dataset contains only 3 columns: disp, hp and cyl.
+
+```{r mtcars_error, error=TRUE}
+result <- dataSubset(mtcars, colNames = c("disp", "hp", "cyl"),  colIndexes = c(1:4), rowNames = c("Mazda RX4", "Merc 450SE", "Fiat 128", "Ford Pantera L"), rowIndexes = c(1:2))
+```
+
+
+
 ## iris
 
 ```{r iris}
-result <- dataSubset(iris, colIndexes = c(1:3, 5), rowIndexes = c(1:2, 89:95, 110:130), splitted_factor = "Species")
-str(result$data)
+result <- dataSubset(iris, colIndexes = c(1:3, 5), rowIndexes = c(1:2, 89:95, 110:130))
+str(result$Data)
 result$columnSums
 result$columnSDs
 result$columnMeans
@@ -116,8 +119,7 @@ What about NA in factor variable?
 
 ```{r iris_with_na}
 iris$Species[1] <- NA
-result <- dataSubset(iris, colIndexes = c(1:3, 5), rowIndexes = c(1:2, 89:95, 110:130), splitted_factor = "Species", calculations="columnSums")
-str(result)
+result <- dataSubset(iris, colIndexes = c(1:3, 5), rowIndexes = c(1:2, 89:95, 110:130))
 result$freqTable
 ```
 
@@ -126,24 +128,10 @@ result$freqTable
 
 ```{r airquality}
 result <- dataSubset(airquality, rowIndexes = c(1:25), colLogicVector = c(T, F, T, F))
-str(result)
+str(result$Data)
 result$columnSums
 result$columnSDs
 result$columnMeans
 result$freqTable
 ```
 
-## mtcars
-
-In this case, we don't perform any calculations, and final result objects is a combination of two lists: filtered data and freqTable (which empty, in our case).
-
-```{r mtcars}
-result <- dataSubset(mtcars, colNames = c("disp", "hp", "cyl"),  colIndexes = c(1:3), rowNames = c("Mazda RX4", "Merc 450SE", "Fiat 128", "Ford Pantera L"), rowIndexes = c(1:2), calculations = NULL)
-str(result)
-```
-
-What if we use wrong values for calculations argument?
-
-```{r mtcars_error, error=TRUE}
-result <- dataSubset(mtcars, colNames = c("disp", "hp", "cyl"),  colIndexes = c(1:4), rowNames = c("Mazda RX4", "Merc 450SE", "Fiat 128", "Ford Pantera L"), rowIndexes = c(1:2), calculations = c("columnSums", "columnMeans", "columnSd"))
-```

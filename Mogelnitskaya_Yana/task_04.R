@@ -15,8 +15,8 @@ rds<- spread(rds, measure, values)
 
 #Part 3. Removing missing values : changed to "No events" in Event column and mean value in numeric columns
 rds <- mutate(rds, Events=replace(rds$Events, which(rds$Events=="") ,"No events"))
-rds[, -c(1,3,22)] <- sapply(rds[, -c(1,3,22)], as.numeric)
+rds$PrecipitationIn <- replace(rds$PrecipitationIn,rds$PrecipitationIn == "T", format(0, nsmall = 2))# replacing "T" with 0.00
+rds[, -c(1,3)] <- sapply(rds[, -c(1,3)], as.numeric) 
 for (i in c(2,4:21,23)){
   rds[,i] <- replace(rds[,i], which(is.na(rds[,i])), mean(rds[,i], na.rm=TRUE))}
-
 
