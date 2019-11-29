@@ -1,7 +1,7 @@
 library (tidyr)
 library (dplyr)
 library (lubridate)
-  data <- readRDS('/home/dmitrii/Projects/R_stat/weather')
+  data <- readRDS('weather')
   data1 <- select(data, -1)
   data1 <- gather(data1, day, parameter, X1:X31, na.rm = TRUE)
   data1$day <- gsub(pattern = "X", replacement = "", x = data1$day, ignore.case = T)
