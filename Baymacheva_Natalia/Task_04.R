@@ -1,0 +1,16 @@
+library(tidyr)
+
+weather <- readRDS("weather.rds")
+
+# Days are represented as X1-X31, change them to numeric
+names(weather)[5:35] <- 1:31
+
+# All the variables are stored in rows, to change it:
+gathered <- gather(weather, 'day', 'val', 5:35, na.rm = T)
+
+# To combine colomns with year, month and day:
+gathered <- unite(gathered, Day, year, month, day, sep = '-')
+gathered$Day <- as.Date(gathered$Day)
+
+# To spread the dataset by each characterictic:
+weath <- pivot_wider(gathered, id_cols = Day, names_from = measure, values_from = val)
