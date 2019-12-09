@@ -1,0 +1,21 @@
+f <- function(data_frame, row_selection, colomn_selection) {
+  
+  df <- data_frame[row_selection, colomn_selection]
+  print(df)
+  i <- 1
+  m <- list()
+  for (colomn in df) {
+    if (is.numeric(colomn)) {
+      m[[i]] <- mean(colomn)
+    } else {
+      m[[i]] <- table(colomn)
+    }
+    i <- i + 1
+  }
+  
+  return(list(df, m))
+}
+
+f(iris, 2:4, 2:4)
+
+f(cars, 1:8, 1:2)
