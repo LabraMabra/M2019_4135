@@ -6,7 +6,7 @@ library(tidyr)
 Return_me_2007 <- filter(gapminder, year == 2007)
 
 # Size of points set by population size (pop variable)
-ggplot(Return_me_2007, aes(x = gdpPercap, y =lifeExp, 
+ggplot(Return_me_2007, aes(x = log(gdpPercap), y = log(lifeExp), 
                            color = continent,size = pop)) +
   geom_point()
 
