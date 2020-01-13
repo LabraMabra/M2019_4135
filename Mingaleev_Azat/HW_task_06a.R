@@ -8,5 +8,7 @@ Width <- iris_wid$Width
 # Prepare variable for new dataframe long_iris
 long_iris <- cbind(iris_len, Width) %>% separate(Part, c("Part","Dummy"))
 long_iris$Dummy <- NULL
-View(long_iris)
-# Create long_iris dataframe 
+ggplot(long_iris, aes(x = Length,
+                      y = Width,
+                      color = Species)) + geom_point(size = 1) + facet_grid(. ~Part)
+

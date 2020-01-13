@@ -1,0 +1,32 @@
+---
+title: "Task7"
+author: "Valeriia"
+date: "09 01 2020"
+output: pdf_document
+---
+
+```{r message=FALSE}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(gapminder)
+```
+
+```{r}
+gap <- gapminder
+gap <- gap%>%select(-country)%>%
+  group_by(continent, year)
+ggplot(gap, aes(x = gdpPercap, y = lifeExp, color = continent, size = pop))+geom_point()+facet_wrap(~year, nrow = 3, ncol = 4)+scale_x_log10()
+```
+
+```{r}
+air <- airquality
+air2 <- air %>%gather("Measure", "Value", 1:4)
+ggplot(air2, aes(x = Day, y = Value, color = Measure))+geom_point()+geom_line()+facet_grid(Measure~Month, scales = "free")
+```
+
+```{r}
+ggplot(air, aes(x=Solar.R, fill = as.factor(Month)))+geom_density(alpha=0.6)
+ggplot(air, aes(x=Wind, fill = as.factor(Month)))+geom_histogram(bins=10, position="identity", aes(y=..density..),alpha=0.6)+geom_density(alpha=0)
+```
+
