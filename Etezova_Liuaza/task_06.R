@@ -8,15 +8,17 @@ length <- c()
 width <- c()
 species <- c()
 for(i in 1:nrow(iris)) {
-  species[i * 2 - 1] <- iris$Species[i]
-  part[i * 2 - 1] <- 'Petal'
-  length[i * 2 - 1] <- iris$Petal.Length[i]
-  width[i * 2 - 1] <- iris$Petal.Width[i]
+  index <- i * 2 - 1
+  species[index] <- iris$Species[i]
+  part[index] <- 'Petal'
+  length[index] <- iris$Petal.Length[i]
+  width[index] <- iris$Petal.Width[i]
   
-  species[i * 2] <- iris$Species[i]
-  part[i * 2] <- 'Sepal'
-  length[i * 2] <- iris$Sepal.Length[i]
-  width[i * 2] <- iris$Sepal.Width[i]
+  index <- i * 2
+  species[index] <- iris$Species[i]
+  part[index] <- 'Sepal'
+  length[index] <- iris$Sepal.Length[i]
+  width[index] <- iris$Sepal.Width[i]
 }
 
 iris_long <- data.frame('Species' = factor(species, labels=c('setosa', 'versicolor', 'virginica')),
