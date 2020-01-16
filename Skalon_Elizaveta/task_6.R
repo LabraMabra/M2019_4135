@@ -7,10 +7,10 @@ data("gapminder")
 
 ### part A
 View(iris)
-# add ids
-iris$id <- 1:nrow(iris)
+
 # make long df
 iris %>% 
+  mutate(id = 1:nrow(iris)) %>% 
   gather(key = trait, value = measurement, 1:4) %>% 
   separate(trait, c('Part', 'measure'))  %>% 
   spread(measure, measurement) -> 
@@ -37,15 +37,16 @@ gapminder %>%
   summarise(mean_lifeExp=mean(lifeExp)) -> df_mean
 ggplot(df_mean, aes(year, mean_lifeExp, color=continent)) +
   geom_point(size=2.5) +
-  geom_line(size=.5)
+  geom_line(size=.5) +
+  coord_cartesian(ylim = c(0, 80))
 
 # total_pop
 gapminder %>%
   group_by(continent, year) %>%
   summarise(total_pop = sum(as.numeric(pop))) -> df_pop
 ggplot(df_pop, aes(year, total_pop, color=continent)) +
-  geom_point(size=2.5) +
-  geom_line(size=.5) 
+  geom_line(size=1) +
+  coord_cartesian(ylim = c(-3e+09, 4e+09))
 
 ## 3
 # barplot - min and max life exp
