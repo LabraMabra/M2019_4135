@@ -6,12 +6,12 @@ library(ggpubr)
 
 new_iris <- cbind(1:150, iris) %>%
   pivot_longer(cols = c(2:5)) %>%
-  separate("name", c("Flower_part", "L/W"))
+  separate("name", c("Flower_part", "LengthWidth"))
 
 new_iris$`Flower_part` <- as.factor(new_iris$`Flower_part`)
-new_iris$`L/W` <- as.factor(new_iris$`L/W`)
+new_iris$`LengthWidth` <- as.factor(new_iris$`LengthWidth`)
 
-iris_long <- pivot_wider(new_iris, names_from = 'L/W', values_from = 'value') %>%
+iris_long <- pivot_wider(new_iris, names_from = 'LengthWidth', values_from = 'value') %>%
   select(2:5)
 
 View(iris_long)
