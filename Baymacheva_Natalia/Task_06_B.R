@@ -3,6 +3,7 @@ library(ggplot2)
 library(dplyr)
 library(tidyr)
 library(ggpubr)
+library(scales)
 
 #Year 2007
 gapminder_2007 <- filter(gapminder, year == 2007)
