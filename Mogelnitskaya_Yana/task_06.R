@@ -25,7 +25,8 @@ data <- filter(gapminder, year == 2007)
 data %>%  
   ggplot(aes(x = gdpPercap, y =lifeExp, 
        color = continent,size = pop)) +
-       geom_point(shape = 19)
+       geom_point(shape = 19)+
+       scale_x_log10() 
 
 
 #part1_B2 - scatter+line plot for meanlifeExp
@@ -35,11 +36,13 @@ data <- gapminder %>%
 
 scatterPlot <- data %>%
       ggplot(aes( x = year, y = meanlifeExp, color = continent)) +
-      geom_point(shape = 15) 
+      geom_point(shape = 15)+
+      ylim(c(0,80))
 
 linePlot <-  data %>%
       ggplot(aes( x = year, y = meanlifeExp, color = continent)) +
-      geom_line()
+      geom_line()+
+      ylim(c(0,80))
 
 ggarrange(scatterPlot, linePlot, 
       labels = c("Scatter Plot", "Line Plot"),
