@@ -53,6 +53,7 @@ ggplot(data = gap_mind %>%
   geom_point(shape = 20) +
   xlab("GDP per Capita") +
   ylab("Mean Life Expectancy") +
+  ylim(c(0, 85)) +
   labs(color = "Continent")
 
 #Mean life exp vs year line plot
@@ -66,6 +67,7 @@ ggplot(data = gap_mind %>%
   xlab("Year") +
   ylab("Mean Life Expectancy") +
   labs(color = "Continent") +
+  ylim(c(0, 85)) +
   ggtitle("Mean life expectancy for each continent")
 
 
@@ -130,7 +132,8 @@ ggplot(air_qual_trans,
            y = Value,
            color = Measure)) +
   facet_grid(Measure~Month, scales="free_y") + 
-  geom_line()
+  geom_line() +
+  geom_point(shape = 21, size = 2, fill = 'white')
 
 
 # Some numerical data: distributional plots
