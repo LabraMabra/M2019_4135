@@ -7,15 +7,32 @@ library(ggpubr)
 #Year 2007
 gapminder_2007 <- filter(gapminder, year == 2007)
 
-#Plot + line for lifeExp
-ggplot(gapminder_2007, aes(x = gdpPercap, y = lifeExp, color = continent)) + 
-  geom_point(shape = 18) +
-  geom_line()
+ggplot(gapminder_2007, aes(x = gdpPercap, y = lifeExp, color = continent, size = pop)) + 
+  geom_point() +
+  scale_x_log10()
 
-#Plot  line for total Pop
-ggplot(gapminder_2007, aes(x = gdpPercap, y = pop, color = continent)) + 
-  geom_point(shape = 20) +
-  geom_line()
+#Plot + line for meanLifeExp
+gapminder %>%
+  select(continent, year, lifeExp) %>%
+  group_by(continent) %>%
+  group_by(year, add = T) %>%
+  summarise(meanLifeExp = mean(lifeExp)) %>%
+  ggplot(aes(x = year, y = meanLifeExp, color = continent)) +
+  geom_point() +
+  geom_line() +
+  expand_limits(y = 0)
+
+#Plot + line for totalPop
+gapminder %>%
+  select(continent, year, pop) %>%
+  group_by(continent) %>%
+  group_by(year, add = T) %>%
+  summarise(totalPop = sum(as.numeric(pop))) %>%
+  ggplot(aes(x = year, y = totalPop, color = continent)) +
+  geom_point() +
+  geom_line() +
+  scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
+                labels = trans_format("log10", math_format(10^.x)))
 
 #BARPLOS
 #1. LifeExp in Asia over years
