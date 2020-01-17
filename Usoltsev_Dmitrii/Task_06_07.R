@@ -2,7 +2,7 @@
   library(dplyr)
   library(tidyr)
   library(gapminder)
-  library(gridExtra)
+      library(gridExtra)
   #####Making iris graph###########
   iris_long <- iris  %>% 
     mutate(id = 1:nrow(iris)) %>% 
@@ -18,7 +18,9 @@
     geom_point()+
     scale_x_log10()
   #mean life expectancy
-        g <-  gapminder %>% group_by(continent, year) %>% summarise(MeanLifExp = mean(lifeExp)) 
+        g <-  gapminder %>% 
+          group_by(continent, year) %>% 
+          summarise(MeanLifExp = mean(lifeExp)) 
         geom_point_ <-   ggplot(g, aes(x=year, y = MeanLifExp, col = continent ))+
                         geom_point()+
                         coord_cartesian(ylim = c(0, 80))
@@ -27,7 +29,9 @@
                         coord_cartesian(ylim = c(0, 80))
         grid.arrange(geom_point_,geom_line_, ncol=2, nrow=1)
   #total population over years
-    gapminder %>% group_by(continent, year) %>% summarise(total_pop = sum(as.numeric(pop))) %>%
+    gapminder %>% 
+      group_by(continent, year) %>% 
+      summarise(total_pop = sum(as.numeric(pop))) %>%
       ggplot(aes(x=year, y = total_pop, col = continent ))+
       geom_point()+
       geom_smooth(method = "lm", se = FALSE)
@@ -44,12 +48,15 @@
        scale_x_log10()+
      theme(axis.text.x=element_blank())
   #airquality
-     airquality %>% gather(Parameter, Value, 1:4) %>%
+     airquality %>% 
+       gather(Parameter, Value, 1:4) %>%
        ggplot(aes(x=Day, y=Value, col = Parameter))+
        facet_grid(Parameter~Month, scales = 'free')+
        geom_line()
   #continuous distribution
-     airquality %>% drop_na() %>% gather(Parameter, Value, 1:4) %>%
+     airquality %>% 
+       drop_na() %>% 
+       gather(Parameter, Value, 1:4) %>%
        ggplot(aes(Parameter,Value, fill = Parameter))+
        facet_wrap(Parameter~., scales = 'free')+
        geom_violin(show.legend = F, alpha=0.5, aes(col=Parameter))+
