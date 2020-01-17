@@ -10,7 +10,6 @@ gapminder %>%
   ggplot(aes(x = gdpPercap, y = lifeExp, color = continent, size = pop)) +
   geom_point() +
   facet_wrap(~year) +
-  scale_x_log10() +
   scale_x_log10(breaks = trans_breaks("log10", function(x) 10^x),
                 labels = trans_format("log10", math_format(10^.x)))
 
