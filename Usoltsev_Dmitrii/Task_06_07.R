@@ -2,9 +2,13 @@
   library(dplyr)
   library(tidyr)
   library(gapminder)
+  library(gridExtra)
   #####Making iris graph###########
-  iris_long <- iris  %>% mutate(id = 1:nrow(iris)) %>% gather(Part, Measure, 1:4 ) %>% 
-    separate(Part, c('Part', 'Size_type'))  %>% spread(Size_type, Measure)
+  iris_long <- iris  %>% 
+    mutate(id = 1:nrow(iris)) %>% 
+    gather(Part, Measure, 1:4 ) %>% 
+    separate(Part, c('Part', 'Size_type'))  %>% 
+    spread(Size_type, Measure)
   ggplot(iris_long, aes(x=Length, y=Width, col =Part))+
     geom_point(size = 2)
   ######Gepminder#########
@@ -14,11 +18,14 @@
     geom_point()+
     scale_x_log10()
   #mean life expectancy
-    gapminder %>% group_by(continent, year) %>% summarise(MeanLifExp = mean(lifeExp)) %>%
-      ggplot(aes(x=year, y = MeanLifExp, col = continent ))+
-        geom_point()+
-        geom_smooth(method = "lm", se = FALSE)+
-        coord_cartesian(ylim = c(0, 80))
+        g <-  gapminder %>% group_by(continent, year) %>% summarise(MeanLifExp = mean(lifeExp)) 
+        geom_point_ <-   ggplot(g, aes(x=year, y = MeanLifExp, col = continent ))+
+                        geom_point()+
+                        coord_cartesian(ylim = c(0, 80))
+        geom_line_ <-  ggplot(g, aes(x=year, y = MeanLifExp, col = continent ))+
+                        geom_line()+
+                        coord_cartesian(ylim = c(0, 80))
+        grid.arrange(geom_point_,geom_line_, ncol=2, nrow=1)
   #total population over years
     gapminder %>% group_by(continent, year) %>% summarise(total_pop = sum(as.numeric(pop))) %>%
       ggplot(aes(x=year, y = total_pop, col = continent ))+
