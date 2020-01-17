@@ -25,3 +25,18 @@ airquality %>%
   geom_line()
 
 #Distributional plots for numerical data
+
+#Boxplot of 1/4 mile time depending on the number of gears
+mtcars %>%
+  group_by(Gear = as.factor(gear)) %>%
+  ggplot(aes(x = Gear, y = qsec)) +
+  geom_boxplot() +
+  geom_jitter(aes(color = Gear), width = 0.2, alpha = 0.8)
+
+#Temperature distribution each month
+airquality %>%
+  group_by(Month = as.factor(Month)) %>%
+  ggplot(aes(x = Temp, fill = Month)) +
+  facet_wrap(~Month) +
+  geom_bar()
+
