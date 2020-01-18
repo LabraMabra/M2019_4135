@@ -1,7 +1,6 @@
 f <- function(data_frame, row_selection, colomn_selection) {
   
   df <- data_frame[row_selection, colomn_selection]
-  print(df)
   i <- 1
   m <- list()
   for (colomn in df) {

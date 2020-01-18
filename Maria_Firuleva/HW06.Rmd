@@ -1,0 +1,102 @@
+---
+title: 'Visualization: long iris, gapminder'
+author: "Maria Firuleva"
+date: '7 January 2019'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = T, message = F, warning = F)
+```
+
+```{r a_part}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+
+long_iris <- iris %>% mutate(id = row_number()) %>% 
+  pivot_longer(cols = Sepal.Length:Petal.Width, names_to = "measurement", values_to = "count") %>%
+  separate(measurement, into = c("Part", "Measure")) %>%
+  pivot_wider(names_from = "Measure", values_from = "count") %>% 
+  select(-id)
+
+
+ggplot(long_iris, aes(x = Length,
+                      y = Width,
+                      color = Species))+
+  geom_point(size = 1)+
+  facet_grid(. ~Part)+
+  ggtitle("Distribution of length and width in different iris organs")+
+  theme_bw(base_size = 8)+
+  theme(aspect.ratio = 1, plot.title = element_text(hjust = 0.5, size = 12))
+
+```
+
+
+```{r b_part}
+library(gapminder)
+
+target <- filter(gapminder, year == 2007)
+
+ggplot(target, aes(x = gdpPercap, y = lifeExp, 
+                           color = continent,size = pop)) +
+  geom_point()+
+  scale_x_log10()+
+  theme_bw()+
+  theme(aspect.ratio = 1)
+
+groupped_data <- gapminder %>%  
+  group_by(continent, year) %>%
+  summarise(meanlifeExp = mean(lifeExp))
+
+groupped_data %>%
+  ggplot(aes( x = year, y = meanlifeExp, color = continent)) +
+  geom_point()+
+  ylim(0, 80)+
+  theme_bw()+
+  theme(aspect.ratio = 1)
+
+groupped_data %>%
+  ggplot(aes( x = year, y = meanlifeExp, color = continent)) +
+  geom_line()+
+  theme_bw()+
+  ylim(0, 80)+
+  theme(aspect.ratio = 1)
+  
+gapminder %>% ggplot(aes(x = continent, y = gdpPercap,
+                         color = continent)) + geom_boxplot()+
+  theme_bw()+
+  theme(aspect.ratio = 1)
+
+
+filter(gapminder, 
+       continent == "Africa") %>% ggplot(aes(x = gdpPercap,
+                                                        fill = continent))+
+  geom_density(alpha = 0.6)+
+  theme_bw(base_size = 8)+
+  ggtitle("Africa: gdpPercap")+
+  theme(aspect.ratio = 1, legend.position = "none", axis.title.y=element_blank(), plot.title = element_text(hjust = 0.5, size = 12))
+
+filter(gapminder, continent != "Africa") %>% ggplot(aes(x = gdpPercap,
+                        fill = continent))+
+  geom_density(alpha = 0.6)+
+  theme_bw()+
+  theme(aspect.ratio = 1)
+
+
+gapminder %>% select(gdpPercap,
+                     continent) %>%
+  group_by(continent) %>%
+  summarise(mean_gdp = mean(gdpPercap),
+            sd_gdp = sd(gdpPercap)) %>% mutate(lower = mean_gdp - 3*sd_gdp,
+                                               upper = mean_gdp + 3*sd_gdp) %>%
+  ggplot(aes(x = continent,
+         y = mean_gdp,
+         ymin = lower,
+         ymax = upper)) + geom_bar(stat = "identity",
+                                   fill = "white",
+                                   color = "black")+
+  geom_errorbar(width = 0.2, size = 1)+
+  theme_bw()+
+  theme(aspect.ratio = 1)
+```
