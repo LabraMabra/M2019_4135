@@ -13,8 +13,14 @@ knitr::opts_chunk$set(echo = T, message = F, warning = F)
 library(ggplot2)
 library(dplyr)
 library(tidyr)
-long_iris <- cbind(gather(select(iris, matches(stringr::regex("Length|Species"))), Part_L, Length, -Species),
-      gather(select(iris, matches(stringr::regex("Width"))), Part_W, Width)) %>% separate(Part_L, "Part") %>% select(-Part_W)
+
+long_iris <- iris %>% mutate(id = row_number()) %>% 
+  pivot_longer(cols = Sepal.Length:Petal.Width, names_to = "measurement", values_to = "count") %>%
+  separate(measurement, into = c("Part", "Measure")) %>%
+  pivot_wider(names_from = "Measure", values_from = "count") %>% 
+  select(-id)
+
+
 ggplot(long_iris, aes(x = Length,
                       y = Width,
                       color = Species))+
@@ -32,9 +38,10 @@ library(gapminder)
 
 target <- filter(gapminder, year == 2007)
 
-ggplot(target, aes(x = log(gdpPercap), y = log(lifeExp), 
+ggplot(target, aes(x = gdpPercap, y = lifeExp, 
                            color = continent,size = pop)) +
   geom_point()+
+  scale_x_log10()+
   theme_bw()+
   theme(aspect.ratio = 1)
 
@@ -45,6 +52,7 @@ groupped_data <- gapminder %>%
 groupped_data %>%
   ggplot(aes( x = year, y = meanlifeExp, color = continent)) +
   geom_point()+
+  ylim(0, 80)+
   theme_bw()+
   theme(aspect.ratio = 1)
 
@@ -52,6 +60,7 @@ groupped_data %>%
   ggplot(aes( x = year, y = meanlifeExp, color = continent)) +
   geom_line()+
   theme_bw()+
+  ylim(0, 80)+
   theme(aspect.ratio = 1)
   
 gapminder %>% ggplot(aes(x = continent, y = gdpPercap,
