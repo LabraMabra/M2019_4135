@@ -7,7 +7,8 @@ weather_fixed_days <- gather(weather, day, val, 5 : 35, na.rm = TRUE)
 weather_with_date <- unite(weather_fixed_days, y_m_d, year, month, day)
 
 #date format
-weather_with_date <- lubridate::ymd(weather_with_date$y_m_d)
+########There is probably a mistake in syntax or smth else because I got unknown format for date column 
+weather_with_date$y_m_d <- ymd(weather_with_date$y_m_d)
 
 #remove X col
 weather_with_date$X <- NULL
