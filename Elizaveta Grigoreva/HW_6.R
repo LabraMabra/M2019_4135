@@ -43,6 +43,7 @@ ggplot(subset(gapminder, country == "Afghanistan"),
        aes(x = year, y = pop)) + geom_line() + geom_point()
 
 #count how many passager survived in titanic (class depency)
+titanic <- read.csv2('/Users/Lisa/Downloads/Telegram Desktop/titanic.csv')
 ggplot(titanic, aes(x=pclass, color=factor(survived))) + geom_bar()
 #gender
 ggplot(titanic,aes( x=survived, fill=factor(gender))) + geom_bar()
