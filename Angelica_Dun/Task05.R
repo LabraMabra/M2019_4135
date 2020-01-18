@@ -8,16 +8,16 @@ data_processing <- function(data_frame, row_selection , column_selection, calc_f
   result <- list(selected)
   #select numeric data
   nums <- selected %>% lapply(is.numeric) %>% unlist()
-  #create freq table
+  #create freq table for non-numeric
   freq <- selected[,!nums] %>% table()
   result <- c(result,freq)
   #split the original df
-  fact <- split_f %>%  grep(data_frame %>% colnames())
-  split_df <- selected %>% split( selected[,fact])
-  #perform calc
-  result_numeric <- split_df %>% lapply(function(x) {calc_func(x[nums])})
-  result <- c(result, result_numeric)
+  fact_or <- split_f %>%  grep(data_frame %>% colnames())
+  split_df <- selected %>% split( selected[,fact_or])
+  #perform calculations using anonymnous function
+  res <- split_df %>% lapply(function(x) {calc_func(x[nums])})
+  result <- c(result, res)
   
   return(result)
 }
-print(data_processing(iris,c(1:100), c(1:5), colSums, "Species"))
+print(data_processing(iris, 1:150, 1:5, mean, 'Species'))
