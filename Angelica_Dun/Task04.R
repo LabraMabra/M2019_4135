@@ -1,3 +1,5 @@
+library(tidyr)
+library(lubridate)
 weather <- readRDS("~/Downloads/weather.rds")
 #first, let's get rid of X in days columns
 names(weather)[5:35] <- 1:31
