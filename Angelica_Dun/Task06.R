@@ -45,3 +45,9 @@ gapminder %>%
   geom_line() +
   scale_y_log10(labels = trans_format("log10", math_format(10^.x)))
 
+#Barplots
+ggplot(gapminder, aes(x=continent, fill=continent)) + geom_bar()
+#population per continent at the start and at the end of observation
+gapminder %>% filter(year == 2007 | year == 1952) %>% 
+  ggplot(aes(as.factor(year), y = pop, fill = continent))  +
+  geom_bar(stat = 'identity')
