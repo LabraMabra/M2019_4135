@@ -1,43 +1,33 @@
 
 library(tidyr)
-library(dplyr)
-library(data.table)
-library(lubridate)
-library(anchors)
-
 
 #load data
-weather <- readRDS("~/Desktop/weather.rds")
+weather<- readRDS("~/Desktop/weather.rds")
+
+#set numeric vector
+num <- c(weather[1:20,4], weather[22,4])
 
 #gather days to rows 
-weather_2 <- gather(weather, day, val, X1 : X31, na.rm = TRUE)
+weather_2 <- gather(weather, day, variable, X1:X31, na.rm = T)
 
 #need to remove "X" from day variables
-weather_no_x <- weather_2 %>% separate(day,c('del','day'),sep='X')%>%select(-"del")
+weather_2$day <- gsub("X","",weather_2$day)
 
 #unite date to one column
-weather_united <- unite(weather_no_x, date, year, month, day, sep="/")
+weather_d <-  unite(weather_2, date, day, month, year, sep = "/")
 
 #format date
-weather_united$date <- lubridate::dmy(weather_united$date)
+weather_d$date <- as.Date(weather_d$date,"%d/%m/%Y")
 
-#spread measurements to columns
-weather_spread <- spread(weather_united, measure, val)
+#spread columns
+weather_final <-  pivot_wider(weather_d, id_cols = date, names_from = measure, values_from = variable)
 
-#delete "X" column
-weather_spread$X <- NULL
+#convert T to trace
+weather_final$PrecipitationIn <- gsub("T","0.00",weather_final$PrecipitationIn)
 
-#remove the NA values
-weather_spread_omit <- setDT(weather_spread)[, lapply(.SD, na.omit), by = date]
-
-#convert T to Trace
-weather_trace <- replace.value(weather_spread_omit, "PrecipitationIn", from="T", to="Trace")
-
-#check structure
-str(weather_trace)
-
-
-
+#convert to numeric
+weather_final[num] <- sapply(weather_final[num],as.numeric)
+View(weather_final)
 
 
 

@@ -3,7 +3,7 @@
 
 # If you have factor variable as numbers,
 # convert them to charater type or whatever approach
-stat <- function(data=mtcars, cols=1:ncol(data), rows=1:nrow(data), num_f=median){
+stat <- function(data, cols=1:ncol(data), rows=1:nrow(data), num_f=median){
   
 sub_data <- data %>% dplyr::select(cols) %>% dplyr::slice(rows)   
 res <- lapply(sub_data, 
@@ -17,4 +17,3 @@ return(res)
 
   }
 
-stat()
