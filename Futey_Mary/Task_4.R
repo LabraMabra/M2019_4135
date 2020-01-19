@@ -1,33 +1,33 @@
+
 library(tidyr)
 
 #load data
-weather_2 <- readRDS("~/Desktop/weather.rds")
+weather<- readRDS("~/Desktop/weather.rds")
 
 #set numeric vector
-numeric <- c(weather[1:20,4], weather[22,4])
+num <- c(weather[1:20,4], weather[22,4])
 
 #gather days to rows 
-weather_2 <- gather(weather, day, val, X1 : X31, na.rm = TRUE)
+weather_2 <- gather(weather, day, variable, X1:X31, na.rm = T)
 
 #need to remove "X" from day variables
-weather_no_x$day <- gsub("X","",weather_no_x$day)
+weather_2$day <- gsub("X","",weather_2$day)
 
 #unite date to one column
-weather_united <-   unite(weather_no_x, date, day, month, year, sep = "/")
+weather_d <-  unite(weather_2, date, day, month, year, sep = "/")
+
+#format date
+weather_d$date <- as.Date(weather_d$date,"%d/%m/%Y")
 
 #spread columns
-weather_spread <- spread(weather_united, measure, val)
-
-#convert to numeric
-weather_final[numeric] <- sapply(weather_final[numeric],as.numeric)
+weather_final <-  pivot_wider(weather_d, id_cols = date, names_from = measure, values_from = variable)
 
 #convert T to trace
-weather_final[is.na(weather_final)]<-"Trace"
+weather_final$PrecipitationIn <- gsub("T","0.00",weather_final$PrecipitationIn)
 
-#reorder columns
-weather_final_2 <- weather_final[, c(2, 4, 11, 1, 3, 5:10, 12: 23)]
-
-View(weather_final_2)
+#convert to numeric
+weather_final[num] <- sapply(weather_final[num],as.numeric)
+View(weather_final)
 
 
 
