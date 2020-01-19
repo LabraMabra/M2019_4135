@@ -43,12 +43,32 @@ ui <- fluidPage(sidebarLayout(
                  value = 1,
                  min = 0.5,
                  max = 2),
+    
     sliderInput(inputId = "alpha",
                 label = "Transparancy",
                 value = 0.5,
                 min = 0,
-                max = 1)
+                max = 1),
     
+    selectInput(inputId = "direction",
+                label = "logFC change restriction",
+                choices = c("Upperbound","Lowerbound"),
+                selected = "Upperbound" 
+                ),
+    
+    sliderInput(inputId = "logFC",
+                label = "logFC trashold",
+                value = 0,
+                min = -5,
+                max = 5),
+    
+    sliderInput(inputId = "logCPM",
+                label = "logCPM trashold",
+                value = 0,
+                min = 2.5,
+                max = 10),
+    
+    submitButton("Update View", icon("refresh"))
     
   ),
   
@@ -58,7 +78,8 @@ ui <- fluidPage(sidebarLayout(
     plotOutput(outputId = "BCV"),
     plotOutput(outputId = "scatter"),
     plotOutput(outputId = "logCPM"),
-    plotOutput(outputId = "logFC")
+    plotOutput(outputId = "logFC"),
+    tableOutput(outputId = "table")
     
   )))
   
@@ -106,71 +127,59 @@ server <- function(input, output) {
     fit <- glmFit(edger,design)
     pv.st <- glmLRT(fit,coef=2)
     pv.st$table$PValue <- p.adjust(pv.st$table$PValue, method = p_correction)
-    
-    
-    diffexp <- pv.st$table[pv.st$table$PValue < p_trashold,]
-    up_reg <- diffexp[diffexp$logFC > 0.1,] 
-    down_reg <- diffexp[diffexp$logFC < 0.1,]
-    
-    DE <- ifelse(table_save == "Total", diffexp,
-                 ifelse(table_save == "Up",
-                        up_reg,
-                        ifelse(table_save == "Down", down_reg)))
-    
-    # Write results as list.
-   
-    results$DE.table <- DE
+    geneid <- as.data.frame(rownames(pv.st$table))
+    colnames(geneid) <- "geneid"
+    pv.st$table<- cbind(geneid,
+    pv.st$table) 
     results$mat_cor <- mat_cor
     results$pv.st <- pv.st
-    
     return(results)
   }
   
 
-
+res <-  reactive({my_project(filename = input$data,
+             hm_method = input$method,
+             p_correction = input$p_correction,
+             p_trashold = input$pval,
+             table_save = input$table)})
+  
 output$heatmap <- renderPlot({
   
   
-  heatmap(my_project(filename = input$data,
-                             hm_method = input$method,
-                             p_correction = input$p_correction,
-                             p_trashold = input$pval,
-                             table_save = input$table)$mat_cor)
+  heatmap(res()$mat_cor)
   
   })
 
 output$BCV <- renderPlot({
   
   
-  plotBCV(my_project(filename = input$data,
-                     hm_method = input$method,
-                     p_correction = input$p_correction,
-                     p_trashold = input$pval,
-                     table_save = input$table)$edger)
+  plotBCV(res()$edger)
   
 })
 
 
 output$scatter <- renderPlot({
-  dfeg <- my_project(filename = input$data,
-             hm_method = input$method,
-             p_correction = input$p_correction,
-             p_trashold = input$pval,
-             table_save = input$table)$pv.st
+  dfeg <- res()$pv.st
   
-  plotSmear(dfeg, 
+  if(input$direction == "Upperbound"){
+      condition <- dfeg$table$PValue < input$pval & dfeg$table$logFC > input$logFC & dfeg$table$logFC > input$logCPM
+      plotSmear(dfeg, 
                               de.tags = rownames(dfeg$table)
-                             [dfeg$table$PValue < 0.05],
+                             [condition],
                             cex=input$size)
-  
+  } else {
+    condition <- dfeg$table$PValue < input$pval & dfeg$table$logFC < input$logFC & dfeg$table$logFC > input$logCPM  
+    plotSmear(dfeg, 
+              de.tags = rownames(dfeg$table)
+              [condition],
+              cex=input$size)
+    
+    
+  }
 })
 
 output$logCPM <- renderPlot({
-  res <- my_project(filename = input$data,
-                    hm_method = input$method,
-                    p_correction = input$p_correction,
-                    p_trashold = input$pval,
-                    table_save = input$table)$pv.st$table
+  res <- res()$pv.st$table
   
   ggplot(res, aes(logCPM)) + geom_density(fill = "green",
                                           color = "green",
@@ -179,11 +188,7 @@ output$logCPM <- renderPlot({
 })
 
 output$logFC <- renderPlot({
-  res <- my_project(filename = input$data,
-                    hm_method = input$method,
-                    p_correction = input$p_correction,
-                    p_trashold = input$pval,
-                    table_save = input$table)$pv.st$table
+  res <- res()$pv.st$table
   
   ggplot(res, aes(logFC)) + geom_density(fill = "red",
                                          color = "red",
@@ -192,6 +197,18 @@ output$logFC <- renderPlot({
 
 })
 
+output$table <- renderTable({
+  res <- res()$pv.st$table
+  
+  if(input$direction == "Upperbound"){
+    filter(res,
+         PValue < input$pval & logFC > input$logFC & logCPM > input$logCPM)}
+  else {
+         filter(res,
+                PValue < input$pval & logFC < input$logFC & logCPM > input$logCPM) 
+  }
+  
+})
 
 
 }
