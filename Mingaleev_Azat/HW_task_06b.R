@@ -19,12 +19,12 @@ total_data <- gapminder %>%
 # points
 total_data %>%
   ggplot(aes(x = year, y = meanlifeExp, color = continent)) +
-  geom_point() + ylim(c(20,80))
+  geom_point() + ylim(c(0,80))
 
 # lines
 total_data %>%
   ggplot(aes( x = year, y = meanlifeExp, color = continent,)) +
-  geom_line() + ylim(c(20,80))
+  geom_line() + ylim(c(0,80))
 
 # Boxplot. 
 
