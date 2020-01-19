@@ -17,9 +17,7 @@ kek <- gapminder %>%
   filter(year == 2007)
 
 # B1:
-ggplot(kek, mapping = aes(x =  gdpPercap, y = lifeExp, color = continent, size = pop)) + geom_point() + scale_x_log10() 
-  #geom_boxplot() +
-  #geom_jitter(position = position_jitter(width = 0.1, height = 0), alpha = 1/4)
+ggplot(kek, mapping = aes(x =  gdpPercap, y = lifeExp, color = continent, size = pop)) + geom_point() + scale_x_log10()
 
 # B2:
 a <- ggplot(gapminder %>% group_by(year, continent) %>% summarise(meanLifeExp = mean(lifeExp)), mapping = aes(x = year, y = meanLifeExp,  color = continent)) + geom_line() + ylim(0, 80)
@@ -32,5 +30,24 @@ ggplot(gapminder %>% filter(year == 1992) %>% filter(continent == "Europe"), map
 ggplot(gapminder %>% filter(year == 2007) %>% filter(continent == "Europe"), mapping = aes(country, gdpPercap)) + geom_bar(stat = "identity")
 
 
+# 7.1
 
-#View(kek)
+ggplot(gapminder, mapping = aes(x =  gdpPercap, y = lifeExp, color = continent, size = pop)) + geom_point() + scale_x_log10() + facet_wrap(~ year)
+
+
+# 7.2
+
+ggplot(airquality %>% pivot_longer(cols = Ozone:Temp, names_to = "measurement"), mapping = aes(x =  Day, y = value, color = measurement)) +
+ geom_point() + geom_line() + facet_grid(measurement ~ Month, scales = "free_y")
+
+
+# 7.3
+ggplot(infert, mapping = aes(x = education, y = parity)) + geom_boxplot() + geom_jitter(width = .1, alpha = .5)
+
+ggplot(infert, mapping = aes(x = induced, y = spontaneous, color = education, size = parity)) + geom_jitter(width = .2, height = .2, alpha = .5)
+
+
+
+
+
+
