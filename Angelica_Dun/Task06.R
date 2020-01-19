@@ -22,3 +22,26 @@ filter(gapminder, year == 2007) %>%
              size = pop,
              color = continent))+
   geom_point()  +labs(size = "Population", color = "Continent") + scale_x_log10()
+
+#B2
+#mean life exp (line+scatter)
+gapminder %>%
+  select(continent, year, lifeExp) %>%
+  group_by(continent) %>%
+  group_by(year, add = T) %>%
+  summarise(meanLifeExp = mean(lifeExp)) %>%
+  ggplot(aes(x = year, y = meanLifeExp, color = continent)) +
+  geom_point() +
+  geom_line()
+
+#total Pop
+gapminder %>%
+  select(continent, year, pop) %>%
+  group_by(continent) %>%
+  group_by(year, add = T) %>%
+  summarise(totalPop = sum(pop)) %>%
+  ggplot(aes(x = year, y = totalPop, color = continent)) +
+  geom_point() +
+  geom_line() +
+  scale_y_log10(labels = trans_format("log10", math_format(10^.x)))
+
