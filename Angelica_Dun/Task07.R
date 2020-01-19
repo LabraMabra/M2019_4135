@@ -28,3 +28,15 @@ airquality %>%
   facet_grid(Measure ~ Month, scales = "free_y") +
   geom_point() +
   geom_line()
+
+
+#temperature distribution by geom_histogram()
+ggplot(airquality, 
+       aes(x = Temp,
+           fill = as.factor(Month))) +
+  geom_histogram(position = "dodge", bins = 10) +
+  ylab("Count") +
+  labs(fill = "Month")
+
+#petal length by hist()
+hist(iris$Petal.Length, col="blue", xlab="Petal Length", main="Colored histogram")
