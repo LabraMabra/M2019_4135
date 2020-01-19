@@ -22,7 +22,7 @@ air_long %>% ggplot(aes(x = Day,
                         color = parameter)) +
   geom_point() +
   geom_line() + 
-  facet_grid(parameter  ~ Month)
+  facet_grid(parameter  ~ Month, scales = "free")
 
 # Numerical Data from gapminder
 gapminder %>% ggplot(aes(x = gdpPercap,
