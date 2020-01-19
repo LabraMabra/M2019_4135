@@ -2,13 +2,15 @@ library(gapminder)
 library(ggplot2)
 library(dplyr)
 library(tidyr)
-gapminder %>% ggplot(aes(y = log(lifeExp), x = log(gdpPercap), 
+gapminder %>% ggplot(aes(y = lifeExp, x = gdpPercap, 
                                          color = continent,
                          size =  pop)) +
   geom_point(alpha = 0.6) + facet_wrap(~ year,
                                        nrow = 3,
-                                       scales = "free",
-                                       as.table = F)
+                                       scales = "fixed",
+                                       as.table = F) +
+  scale_x_log10(breaks = c(1e3,1e4,1e5)) +
+  scale_y_continuous(breaks = c(40,60,80))
 
 
 # Airquality data
