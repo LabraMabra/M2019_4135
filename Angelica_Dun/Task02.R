@@ -5,7 +5,7 @@ data_processing <- function(data_frame, row_selection, column_selection){
     if (is.numeric(selected[,i]) ){
       calc[[i]] <- c(mean(selected[,i])) 
     } else {
-      calc[[i+1]] <-(table(selected[,i]))
+      calc[[i]] <-(table(selected[,i]))
     }
   }
   return(list(calc,selected))

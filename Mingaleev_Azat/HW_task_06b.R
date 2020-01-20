@@ -6,9 +6,9 @@ library(tidyr)
 Return_me_2007 <- filter(gapminder, year == 2007)
 
 # Size of points set by population size (pop variable)
-ggplot(Return_me_2007, aes(x = log(gdpPercap), y = log(lifeExp), 
+ggplot(Return_me_2007, aes(x = gdpPercap, y = lifeExp, 
                            color = continent,size = pop)) +
-  geom_point()
+  geom_point() + scale_x_log10(breaks =c(1000,10000))
 
 total_data <- gapminder %>%  
   group_by(continent, year) %>%
@@ -18,13 +18,13 @@ total_data <- gapminder %>%
 
 # points
 total_data %>%
-  ggplot(aes( x = year, y = meanlifeExp, color = continent)) +
-  geom_point() 
+  ggplot(aes(x = year, y = meanlifeExp, color = continent)) +
+  geom_point() + ylim(c(0,80))
 
 # lines
 total_data %>%
-  ggplot(aes( x = year, y = meanlifeExp, color = continent)) +
-  geom_line()
+  ggplot(aes( x = year, y = meanlifeExp, color = continent,)) +
+  geom_line() + ylim(c(0,80))
 
 # Boxplot. 
 
