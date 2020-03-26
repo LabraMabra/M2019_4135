@@ -1,0 +1,321 @@
+---
+title: "Homework-2-1"
+author: "Valeriia"
+date: "24 03 2020"
+output: pdf_document
+---
+
+```{r message=FALSE}
+library(dplyr)
+library(ggplot2)
+library(ggpubr)
+theme_set(theme_pubr())
+```
+
+## 1. Measures of center
+
+```{r}
+x <- c(175, 176, 182, 165, 167, 172, 175, 196, 158, 172)
+
+gmode <- function(x){
+  un <- unique(x)
+  r <- tabulate(match(x, un))
+  return(un[r == max(r)])
+}
+
+gmedian <- function(x){
+  if (length(x)%%2==0){
+    return(x[length(x)/2])
+  }
+  else{
+    n <- x[(length(x)/2)+1]
+    m <- x[(length(x)/2)]
+    return((n+m)/2)
+  }
+}
+
+gmean <- function(x, t){
+  if (t!=0){
+    x <- x[(length(x)*t+1):(length(x)-length(x)*t+1)]
+    return(sum(x)/length(x))
+  }
+  else{
+    return(sum(x)/length(x))
+  }
+}
+  
+x <- sort(x)
+mean(x,trim=0.3)
+gmean(x, 0.3)
+
+gmode(x)
+
+median(x)
+gmedian(x)
+
+lines <- c(gmean(x, 0), gmode(x), gmedian(x))
+
+ggplot(as.data.frame(x), aes(x)) + 
+  geom_histogram() +
+  geom_vline(xintercept = gmean(x,0), color = "red") + 
+  geom_vline(xintercept = gmedian(x), color = "blue") + 
+  geom_vline(xintercept = gmode(x), color = "green")
+```
+
+
+# 1.3 Outliers
+
+```{r}
+x <- c(50, 175, 176, 182, 165, 167, 172, 175, 196, 158, 172, 300)
+x <- sort(x)
+mean(x,trim=0.3)
+gmean(x, 0.3)
+
+gmode(x)
+
+median(x)
+gmedian(x)
+
+lines <- c(gmean(x, 0), gmode(x), gmedian(x))
+
+ggplot(as.data.frame(x), aes(x)) + 
+  geom_histogram() +
+  geom_vline(xintercept = gmean(x,0), color = "red") + 
+  geom_vline(xintercept = gmedian(x), color = "blue") + 
+  geom_vline(xintercept = gmode(x), color = "green")
+```
+
+## 2. Measures of spread
+
+```{r}
+x <- c(175, 176, 182, 165, 167, 172, 175, 196, 158, 172)
+
+range(x)
+grange <- function(x){
+  return (c(min(x), max(x)))
+}
+grange(x)
+
+IQR(x)
+giqr <- function(x){
+  return (quantile(x, 3/4)-quantile(x, 1/4))
+}
+giqr(x)
+
+var(x)
+gvar <- function(x){
+    return((sum((x-mean(x))^2))/(length(x)-1))
+  }
+gvar(x)
+
+sd(x)
+gsd <- function(x){
+  return (sqrt((sum((x-mean(x))^2))/(length(x)-1)))
+}
+gsd(x)
+
+ggplot(as.data.frame(x), aes(x)) + 
+  geom_boxplot()+
+  geom_hline(yintercept = range(x), color = "red") + 
+  geom_hline(yintercept = sd(x), color = "blue") + 
+  geom_hline(yintercept = IQR(x), color = "green")
+
+  
+x <- c(50, 175, 176, 182, 165, 167, 172, 175, 196, 158, 172, 300)
+
+range(x)
+grange(x)
+
+IQR(x)
+giqr(x)
+
+var(x)
+gvar(x)
+
+sd(x)
+gsd(x)
+
+ggplot(as.data.frame(x), aes(x)) + 
+  geom_boxplot()+
+  geom_hline(yintercept = range(x), color = "red") + 
+  geom_hline(yintercept = sd(x), color = "blue") + 
+  geom_hline(yintercept = IQR(x), color = "green")
+
+```
+
+# 2.3 Outliers
+
+```{r}
+x <- c(50, 175, 176, 182, 165, 167, 172, 175, 196, 158, 172, 300)
+
+range(x)
+grange(x)
+
+IQR(x)
+giqr(x)
+
+var(x)
+gvar(x)
+
+sd(x)
+gsd(x)
+
+ggplot(as.data.frame(x), aes(x)) + 
+  geom_boxplot()+
+  geom_hline(yintercept = range(x), color = "red") + 
+  geom_hline(yintercept = sd(x), color = "blue") + 
+  geom_hline(yintercept = IQR(x), color = "green")
+```
+
+## 3. Properties
+
+```{r}
+x <- c(175, 176, 182, 165, 167, 172, 175, 196, 158, 172)
+
+x1 <- x-100
+x2 <- x/100
+
+for_see <- as.data.frame(rbind(c(gmean(x,0),gmean(x1,0), gmean(x2,0)), c(gvar(x), gvar(x1), gvar(x2)), c(sqrt((sum((x-mean(x))^2))/(length(x)-1)), sqrt((sum((x1-mean(x1))^2))/(length(x1)-1)), sqrt((sum((x2-mean(x2))^2))/(length(x2)-1)))))
+colnames(for_see) <- c("x", "x-100", "x/100")
+rownames(for_see) <- c("gmean", "gvar", "gsd")
+for_see
+
+for_plot <- as.data.frame(cbind(c(rep("x",10), rep("x-100",10), rep("x/100",10)), c(x,x1,x2), c(rep(for_see$x[1], 10), rep(for_see$`x-100`[1], 10), rep(for_see$`x/100`[1], 10)), c(rep(for_see$x[2], 10), rep(for_see$`x-100`[2], 10), rep(for_see$`x/100`[2], 10)), c(rep(for_see$x[3], 10), rep(for_see$`x-100`[3], 10), rep(for_see$`x/100`[3], 10))), stringsAsFactors = FALSE)
+colnames(for_plot) <- c("vector", "number", "mean", "var", "sd")
+for (i in 2:ncol(for_plot)) {
+  for_plot[,i] <- as.numeric(for_plot[,i])
+}
+
+for_plot$vector <- as.factor(for_plot$vector)
+
+plot2 <- as.data.frame(t(for_see))
+
+plot2$vector <- row.names(plot2)
+
+p1 <- ggplot(for_plot[1:10,], aes(number)) + 
+  geom_density()+
+  geom_vline(xintercept = mean(for_plot[1:10,]$number), color="red")+
+  geom_vline(xintercept = var(for_plot[1:10,]$number), color="blue")+
+  geom_vline(xintercept = sd(for_plot[1:10,]$number), color="green")
+
+p2 <- ggplot(for_plot[11:20,], aes(number)) + 
+  geom_density()+
+  geom_vline(xintercept = mean(for_plot[11:20,]$number), color="red")+
+  geom_vline(xintercept = var(for_plot[11:20,]$number), color="blue")+
+  geom_vline(xintercept = sd(for_plot[11:20,]$number), color="green")
+
+p3 <- ggplot(for_plot[21:30,], aes(number)) + 
+  geom_density()+
+  geom_vline(xintercept = mean(for_plot[21:30,]$number), color="red")+
+  geom_vline(xintercept = var(for_plot[21:30,]$number), color="blue")+
+  geom_vline(xintercept = sd(for_plot[21:30,]$number), color="green")
+
+figure <- ggarrange(p1, p2, p3,
+                    labels = c("X", "X-100", "X/100"),
+                    ncol = 2, nrow = 2)
+figure
+```
+
+## 4. Normal distribution
+
+```{r}
+pnorm(156, mean = 175, sd = 10, lower.tail = TRUE)
+pnorm(198, mean = 175, sd = 10, lower.tail = FALSE)
+pnorm(168, mean = 175, sd = 10, lower.tail = FALSE)-pnorm(172, mean = 175, sd = 10, lower.tail = TRUE)
+```
+
+# Standardization
+
+```{r}
+set.seed(1)
+x <- rnorm(1000, mean = 175, sd = 10)
+mean(x)
+sd(x)
+x1 <- (x-mean(x))/sd(x)
+mean(x1)
+sd(x1)
+
+x <- rnorm(1000, mean = 0, sd = 1)
+mean(x)
+sd(x)
+```
+
+## 5. Central Limit Theorem
+
+```{r}
+set.seed(1)
+x <- rnorm(1e6, mean = 0, sd = 1)
+#10
+k1 <- replicate(30, sample(x, 10))
+means <- function(k){
+  m <- c()
+  for (i in 1:ncol(k)) {
+    m[i] <- mean(k[,i])
+  }
+  return(m)
+}
+m1 <- means(k1)
+mean(m1)
+sd(m1)
+SE <- function(k){
+  return(sd(k)/sqrt(length(k)))
+}  
+SE(m1)
+
+ggplot(as.data.frame(m1), aes(m1)) + 
+  geom_histogram() +
+  geom_vline(xintercept = mean(m1), color = "red") + 
+  geom_vline(xintercept = SE(m1), color = "blue")
+
+#50
+k2 <- replicate(30, sample(x, 50))
+
+m2 <- means(k2)
+mean(m2)
+sd(m2)
+ 
+SE(m2)
+
+ggplot(as.data.frame(m2), aes(m2)) + 
+  geom_histogram() +
+  geom_vline(xintercept = mean(m2), color = "red") + 
+  geom_vline(xintercept = SE(m2), color = "blue")
+
+#100
+k3 <- replicate(30, sample(x, 100))
+
+m3 <- means(k3)
+mean(m3)
+sd(m3)
+ 
+SE(m3)
+
+ggplot(as.data.frame(m3), aes(m3)) + 
+  geom_histogram() +
+  geom_vline(xintercept = mean(m3), color = "red") + 
+  geom_vline(xintercept = SE(m3), color = "blue")
+
+#500
+k4 <- replicate(30, sample(x, 500))
+
+m4 <- means(k4)
+mean(m4)
+sd(m4)
+ 
+SE(m4)
+
+ggplot(as.data.frame(m4), aes(m4)) + 
+  geom_histogram() +
+  geom_vline(xintercept = mean(m4), color = "red") + 
+  geom_vline(xintercept = SE(m4), color = "blue")
+
+tk1 <- c(10, mean(m1), sd(m1), SE(m1))
+tk2 <- c(50, mean(m2), sd(m2), SE(m2))
+tk3 <- c(100, mean(m3), sd(m3), SE(m3))
+tk4 <- c(500, mean(m4), sd(m4), SE(m4))
+
+tablek <- as.data.frame(rbind(tk1,tk2,tk3,tk4))
+colnames(tablek) <- c("k", "mean of means", "sd of means", "SE of means")
+tablek
+
+```
