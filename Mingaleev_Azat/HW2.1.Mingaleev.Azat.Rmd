@@ -1,0 +1,210 @@
+---
+title: "Rclass_HW2.1.Mingaleev.Azat"
+author: "Azat"
+date: '26 марта 2020 г '
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r center}
+library(ggplot2)
+library(tidyr)
+set.seed(42)
+test <- c(175, 176, 165, 167, 172, 175, 158, 172)
+
+# Mode
+my_mode <- function(x) as.numeric(names(which(table(x) == max(table(x)))))
+my_mode(test)
+
+my_mean <- function(x) sum(x) / length(x)
+mean(test)
+my_mean(test)
+mean(test, trim = 0.1)
+
+my_median <- function(x) quantile(x, 1/2)
+my_median(test)
+
+# Add three lines for mean, median and mode at histogram
+ggplot(as.data.frame(test), aes(x = test)) + 
+  geom_histogram() +
+  geom_vline(xintercept = my_mode(test), color = "green") + 
+  geom_vline(xintercept = my_mean(test), color = "blue") + 
+  geom_vline(xintercept = my_median(test), color = "red") 
+  
+
+# Spoil the sample
+spoiled_test <- c(test, 196,100)
+
+my_mode(spoiled_test)
+
+my_mean(spoiled_test)
+
+my_median(spoiled_test)
+
+ggplot(as.data.frame(spoiled_test), aes(x = spoiled_test)) + 
+  geom_histogram() +
+  geom_vline(xintercept = my_mode(spoiled_test), color = "green") + 
+  geom_vline(xintercept = my_mean(spoiled_test), color = "blue") + 
+  geom_vline(xintercept = my_median(spoiled_test), color = "red") 
+  
+```
+
+
+```{r spread}
+# write own implementation and check original test
+my_range <- function(x) c(min(x),max(x))
+
+my_range(test)
+
+My_Var <- function(x) my_mean(x^2) - my_mean(x)^2
+
+My_Var(test)
+
+My_Sd <- function(x) sqrt(My_Var(x))
+
+My_Sd(test)
+
+My_IQR <- function(x) quantile(x, 3/4) - quantile(x, 1/4)
+
+My_IQR(test)
+
+ggplot(as.data.frame(test), aes(y = test)) +
+  geom_boxplot() +
+  geom_hline(yintercept = my_range(test), color = "green") +
+  geom_hline(yintercept = c(my_mean(test) - My_Sd(test),
+                            my_mean(test) +My_Sd(test)), 
+             color = "red") +
+  geom_hline(yintercept = c(my_median(test) + My_IQR(test),
+                            my_median(test) - My_IQR(test)),
+             color = "blue")
+# And check on spoil_test
+my_range(spoiled_test)
+
+My_Var(spoiled_test)
+
+My_Sd(spoiled_test)
+
+My_IQR(spoiled_test)
+
+
+ggplot(as.data.frame(spoiled_test), aes(y = spoiled_test)) +
+  geom_boxplot() +
+  geom_hline(yintercept = my_range(spoiled_test), color = "green") +
+  geom_hline(yintercept = c(my_mean(spoiled_test) - My_Sd(spoiled_test),
+                            my_mean(spoiled_test) +My_Sd(spoiled_test)), 
+             color = "red") +
+  geom_hline(yintercept = c(my_median(spoiled_test) + My_IQR(spoiled_test),
+                            my_median(spoiled_test) - My_IQR(spoiled_test)),
+             color = "blue")
+```
+```{r properties}
+stat <- function(x) sapply(c(my_mean, My_Var, My_Sd), function(func) func(x))
+
+stat_property <- cbind(test, 
+                       test - 100, test / 100)
+
+stat_property <- data.frame(stat_property)
+colnames(stat_property) <- c("X", "X-100", "X/100") 
+
+mean_table <- cbind(stat(test),
+                    stat(test-100),
+                    stat(test/100))
+
+colnames(mean_table) <- c("X", "X-100", "X/100")
+# Tabular  
+mean_table
+
+# graphics
+gather(stat_property) %>% ggplot(aes(x = value)) +
+  geom_histogram() + facet_wrap(~key, scales = "free")
+# Shape of distribution will be the same.
+```
+
+
+
+```{r normal_distr}
+# 4.0 for the population N(175, 10) find the probability to be:
+# less than 156cm,
+pnorm(156, mean = 175, sd = 10)
+# more than 198,
+1 - pnorm(198, mean = 175, sd = 10)
+# between 168 and 172 cm
+pnorm(172, mean = 175, sd = 10) - pnorm(168, mean = 175, sd = 10)
+# 1-2-3 sd rule
+pnorm(1) - pnorm(-1)
+pnorm(2) - pnorm(-2)
+pnorm(3) - pnorm(-3)
+
+my_sample <- rnorm(100, mean = 175, sd = 10)
+
+mean(my_sample) # ~175 if we increase the size sample
+sd(my_sample)
+
+standardize <- (my_sample - mean(my_sample)) / sd(my_sample)
+mean(standardize) # near to 0
+sd(standardize) # 1
+
+# We can create same distribution N(0, 1)
+already_standart <- rnorm(100, mean = 0, sd = 1)
+mean(already_standart)
+sd(already_standart)
+
+```
+
+
+```{r central_limit_theorem}
+
+# Central limit theorem
+
+population <- rnorm(1e5, mean = 0, sd = 1)
+
+sample_mean <- function(x=population,k=30) mean(sample(x, size = k, replace = T))
+
+
+means_stat <- function(s) {
+emp <- replicate(1000, sample_mean(k=s))
+
+res <- c(mean(emp), sd(emp), sd(emp) / sqrt(length(emp)))
+names(res) <- c("Mean", "Sd", "SE")
+return(res)
+}
+
+central_theorem <- sapply(c(10, 30, 50, 100, 500), means_stat)
+# I used rule of type's converse or something like that
+colnames(central_theorem) <- c(10, 30, 50, 100, "500")
+central_theorem
+# Sd and SE became smaller andsample mean approaches to population mean
+
+# Build the histograms
+
+remp <- function(i) sample_mean(k=i)
+rand_matrx <- replicate(1e3, sapply(c(10, 30, 50, 100, 500), remp))
+# transpose
+rand_matrx <- t(rand_matrx)
+colnames(rand_matrx) <- c(10, 30, 50, 100, 500)
+rand_data <- as.data.frame(rand_matrx)
+
+# Visualize distribution of means
+# graph are sorted in lexicographical order. How I can assign my order?
+gather(rand_data) %>% ggplot(aes(x = value)) + geom_histogram() +
+  facet_grid(. ~key)
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
