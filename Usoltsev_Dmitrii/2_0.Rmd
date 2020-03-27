@@ -1,0 +1,247 @@
+---
+title: "2_0"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r libraries}
+set.seed(42)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(gridExtra)
+samp <- c(175,176,182,165,167,172,175,196,158,172)
+```
+
+## Make function for mod, mean, median
+
+```{r 1}
+mod <- function(x) {
+y <- as.data.frame(table(x))
+return(as.numeric(as.vector(y$x[y$Freq==max(y$Freq)])))
+}
+     
+mod(samp)
+mean_ <- function(x) {
+return (sum(x)/length(x))
+}
+      
+mean_(samp)
+median_ <- function(x) {
+x <- sort(x)
+if (length(x)%%2 != 0) {
+return (x[length(x)/2])
+}
+else {
+return ((x[length(x)/2]+x[length(x)/2+1])/2)
+}
+}
+median_(samp)
+#compearing with built-in functions
+mean(samp)
+median(samp)
+```
+##visualize histogram with 3 vertical lines for measures of center
+```{r 1.3}
+as.data.frame(samp) %>% ggplot(aes(samp)) +
+              geom_density(fill='green')+
+              geom_vline(xintercept=mean_(samp),col='red')+
+              geom_vline(xintercept=median_(samp),col='black')+
+              geom_vline(xintercept= mod(samp),col='blue')+
+              scale_x_discrete('height')+
+              scale_y_continuous('density')
+```
+##Add outliers, mean shifts
+```{r 1.4}
+samp <- c(175,176,182,165,167,172,175,196,158,172,290)
+mod(samp) #my
+mean(samp)
+mean_(samp) #my
+median(samp)
+median_(samp) #my
+as.data.frame(samp) %>% ggplot(aes(samp)) +
+              geom_density(fill='green')+
+              geom_vline(xintercept=mean_(samp),col='red')+
+              geom_vline(xintercept=median_(samp),col='black')+
+              geom_vline(xintercept= mod(samp),col='blue')+
+              scale_x_discrete('height')+
+              scale_y_continuous('density')
+```
+## Make function for cd? variance
+```{r 2.1}
+samp <- c(175,176,182,165,167,172,175,196,158,172)
+var_ <-  function(x) {
+        m <- mean_(x)
+        n <-  sapply(x, function(x) (x-m)^2)
+        return(sum(n)/(length(n)-1))
+      }
+var_(samp) #my
+var(samp)
+sd_ <-  function(x) {
+        return(sqrt(var_(x)))
+}
+sd_(samp) #my
+sd(samp)
+      
+```
+
+##visualize boxplot with 3 vertical lines for range, IQR, 1-sd borders
+
+```{r 2.2}
+as.data.frame(samp) %>% ggplot(aes(y=samp)) +
+              geom_boxplot()+
+              geom_hline(yintercept= quantile(samp),col='black')+
+              geom_hline(yintercept=    c(mean_(samp)+sd_(samp),mean_(samp)-sd_(samp)),col='red')+
+  scale_y_continuous('height')
+```
+
+##Add outliers
+```{r 2.3}
+samp <- c(175,176,182,165,167,172,175,196,158,172,290)
+var_(samp) #my
+var(samp)
+sd_(samp) #my
+sd(samp)
+as.data.frame(samp) %>% ggplot(aes(y=samp)) +
+              geom_boxplot()+
+              geom_hline(yintercept= quantile(samp),col='black')+
+              geom_hline(yintercept=    c(mean_(samp)+sd_(samp),mean_(samp)-sd_(samp)),col='red')+
+  scale_y_continuous('height')
+```
+
+## Change values of sample
+```{r 3.1}
+samp <- c(175,176,182,165,167,172,175,196,158,172)
+samp_1 <- samp -100
+samp_2 <- samp /100
+abs(sum(samp - mean(samp))) < 0.000000001 #sum of differences between value i and mean tends to 0
+var(samp_1) == var(samp)
+var(samp_2) - var(samp) / 10000 < 0.000000001
+sd(samp_2) - sd(samp) / 100 < 0.000000001
+#Make table
+tab <- matrix(c(mean(samp),mean(samp_1),mean(samp_2),var(samp),
+                var(samp_1),var(samp_2),sd(samp),sd(samp_1),sd(samp_2)),ncol=3)
+colnames(tab) <- c("Mean","Var","SD")
+rownames(tab) <- c("1","2","3")
+```
+## Visualization of results
+```{r 3.2}
+data <- data.frame("X" = samp , "Xminus100" = samp_1, "Xdiv100" = samp_2)
+a <- data %>% ggplot(aes(X))+
+      geom_density(fill='red')+
+      geom_vline(xintercept=mean(data$X),col='green')+ 
+      scale_y_continuous('density')+
+      scale_x_continuous('height')+
+      ggtitle(label = 'X')
+b <- data %>% ggplot(aes(Xminus100))+
+      geom_density(fill='red')+
+      geom_vline(xintercept=mean(data$Xminus100),col='green')+ 
+      scale_y_continuous('density')+
+      scale_x_continuous('height')+
+      ggtitle(label = 'X-100')
+c <- data %>% ggplot(aes(Xdiv100))+
+      geom_density(fill='red')+
+      geom_vline(xintercept=mean(data$Xdiv100),col='green')+ 
+      scale_y_continuous('density')+
+      scale_x_continuous('height')+
+      ggtitle(label = 'X/100')
+grid.arrange(a, b, c, ncol = 1, nrow = 3)
+```
+
+#№ 4. Normal distribution
+```{r 4}
+m=175
+s=10
+pnorm(q=156,mean=m,sd=s) #less than 156cm
+pnorm(q=198,mean=m,sd=s,lower.tail = F) #more than 198
+pnorm(q=172,mean=m,sd=s)  - pnorm(q=168,mean=175,sd=10) # between 168 and 172 cm
+## Standard normal distribution
+pnorm(q=1,mean=0,sd=1) - pnorm(q=-1,mean=0,sd=1) # 1 sigma
+pnorm(q=2*s,mean=0,sd=1) - pnorm(q=-2,mean=0,sd=1) # 2 sigma
+pnorm(q=3,mean=0,sd=1) - pnorm(q=-3,mean=0,sd=1) # 3 sigma
+```
+## 5 Standardization
+```{r 5}
+n <- rnorm(1000,mean=175,sd=10)
+mean_(n)
+sd_(n)
+## Standart normal distribution
+nn <- rnorm(1000)
+mean_(nn)
+sd_(nn)
+```
+##  Central Limit Theorem
+
+```{r 5.1}
+set.seed(42)
+pop <- rnorm(1000000)
+K_10 <- replicate(10, sample(pop,30))
+K_50 <- replicate(50, sample(pop,30))
+K_100 <- replicate(100, sample(pop,30))
+K_500 <- replicate(500, sample(pop,30))
+
+se <- function(x) sd(x)/sqrt(length(x))
+tab <- matrix(c(mean(colMeans(K_10)) ,sd(colMeans(K_10)) ,se(colMeans(K_10)), mean(colMeans(K_50)) ,
+      sd(colMeans(K_50)),se(colMeans(K_50)),mean(colMeans(K_100)) ,sd(colMeans(K_100)),
+       se(colMeans(K_100)),mean(colMeans(K_500)),sd(colMeans(K_500)) ,se(colMeans(K_500))), ncol = 3, byrow=T)
+
+rownames(tab) <- c("K10","K50","K100", "K500")
+colnames(tab) <- c("mean","sd","se")
+```
+
+```{r 5.2}
+k10 <-  colMeans(K_10)
+length(k10) <- 500
+k50 <-  colMeans(K_50)   
+length(k50) <- 500
+k100 <-  colMeans(K_100)   
+length(k100) <- 500
+k500 <-  colMeans(K_500)     
+length(k500) <- 500
+                     
+data <- data.frame(cbind("K_10" = k10 , "K_50" = k50, "K_100" = k100, "K_500" = k500))
+
+a <- data %>% ggplot(aes(K_10))+
+      geom_histogram(bins=30)+
+      geom_vline(xintercept=mean_(K_10),col='red')+ 
+      geom_vline(xintercept=mean_(K_10)+se(K_10),col='green')+ 
+      geom_vline(xintercept=mean_(K_10)-se(K_10),col='green')+ 
+      scale_y_continuous('density')+
+      scale_x_continuous('mean')+
+      ggtitle(label = 'k10')
+
+b <- data %>% ggplot(aes(K_50))+
+      geom_histogram(bins=30)+
+      geom_vline(xintercept=mean_(K_50),col='red')+ 
+      geom_vline(xintercept=mean_(K_50)+se(K_50),col='green')+ 
+      geom_vline(xintercept=mean_(K_50)-se(K_50),col='green')+ 
+      scale_y_continuous('density')+
+      scale_x_continuous('mean')+
+      ggtitle(label = 'k50')
+
+c <- data %>% ggplot(aes(K_100))+
+      geom_histogram(bins=30)+
+      geom_vline(xintercept=mean_(K_100),col='red')+ 
+      geom_vline(xintercept=mean_(K_100)+se(K_100),col='green')+ 
+      geom_vline(xintercept=mean_(K_100)-se(K_100),col='green')+ 
+      scale_y_continuous('density')+
+      scale_x_continuous('mean')+
+      ggtitle(label = 'k100')
+
+d <- data %>% ggplot(aes(K_500))+
+      geom_histogram(bins=30)+
+      geom_vline(xintercept=mean_(K_500),col='red')+ 
+       geom_vline(xintercept=mean_(K_500)+se(K_500),col='green')+ 
+      geom_vline(xintercept=mean_(K_500)-se(K_500),col='green')+ 
+      scale_y_continuous('density')+
+      scale_x_continuous('mean')+
+      ggtitle(label = 'k500')
+
+grid.arrange(a, b, c, d, ncol = 2, nrow = 2)
+```
