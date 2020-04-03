@@ -1,0 +1,321 @@
+---
+title: "MLAirquality"
+author: "Azat"
+date: '3 апреля 2020 г '
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r load_libs, warning=FALSE, message=FALSE}
+setwd("~/R_data_analyze/")
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+```
+
+
+```{r load_data, warning=FALSE, message=FALSE}
+# AirQuality (not built-in)
+
+# Note source data has "," as decimal separator.
+AQ <- read.csv("AirQualityUCI.csv", sep=";", dec=",")
+# X and X.1 have uncertain role and consist from only NAs
+# I decided to remove them
+# Additionally, data have some "interesting" values:
+# For example AH (Absolute Humidity) have negative values.
+# Hm... It's means "less than nothing" looks strange 
+# And other paramater have similar outliers. Around -200
+# Maybe, in our case -200 is indicator of missing value
+# (something wrong with detector?)
+# let's filter it
+AQ$X <- NULL
+AQ$X.1 <- NULL
+
+AQ_long <- gather(AQ, key="reagent", value="value", -c(Date,Time))
+AQ_long$Date <- as.factor(AQ_long$Date)
+AQ_long$Time <- as.factor(AQ_long$Time)
+AQ_long$reagent <- as.factor(AQ_long$reagent)
+
+# First look
+AQ_long %>% ggplot(aes(x = value)) +
+  geom_histogram() +
+  facet_wrap(~reagent, scales = "free")
+```
+
+```{r filtration, warning=FALSE, message=FALSE}
+
+AQ_long %>% filter(value != -200) %>% ggplot(aes(x = value)) +
+  geom_histogram() +
+  facet_wrap(~reagent, scales = "free")
+
+
+# filtered data
+AQ_lf <- AQ_long %>% filter(value != -200)
+
+```
+
+```{r normalization, warning=FALSE, message=FALSE}
+
+exp_norm <- function(x) 1 - exp(1 - x/min(x, na.rm = T))
+lin_norm <- function(x) (x - min(x, na.rm = T)) / (max(x, na.rm = T) - min(x, na.rm = T))
+
+# Robastic normalization (standartization)
+rob_norm <- function(x) (x - median(x, na.rm = T)) / IQR(x, na.rm = T)
+
+
+# Now, I have to return wide format for AQ or grouping by `reagent`.
+# It's need to normalize not by all values, but in each group.
+
+
+AQ_wide <- spread(AQ_lf,key = reagent ,value = value)
+
+# robastic_normalization
+AQ_rob <- data.frame(AQ_wide[,1:2],
+                     apply(AQ_wide[,-(1:2)], MARGIN = 2, rob_norm))
+
+gather(AQ_rob, key = "reagent", value = "value", -c(Date, Time)) %>%
+  ggplot(aes(x = value)) +
+  geom_histogram() +
+  facet_wrap(~reagent, scales = "free")
+
+
+# exponentional normalization
+AQ_exp <- data.frame(AQ_wide[,1:2],
+                     apply(AQ_wide[,-(1:2)], MARGIN = 2, exp_norm))
+
+
+gather(AQ_exp, key = "reagent", value = "value", -c(Date, Time)) %>%
+  ggplot(aes(x = value)) +
+  geom_histogram() +
+  facet_wrap(~reagent, scales = "free")
+
+
+# linear
+AQ_lin <- data.frame(AQ_wide[,1:2],
+                     apply(AQ_wide[,-(1:2)], MARGIN = 2, lin_norm))
+
+
+gather(AQ_lin, key = "reagent", value = "value", -c(Date, Time)) %>%
+  ggplot(aes(x = value)) +
+  geom_histogram() +
+  facet_wrap(~reagent, scales = "free")
+
+# Robastic and linear normalization return same shapes of distribution
+# So let's build linear model on Robastic normalized data.
+# But, first a wall, check cross-correlation
+```
+
+```{r cross_correlation, warning=FALSE, message=FALSE}
+
+heatmap(cor(AQ_rob[,-(1:2)], use = "complete.obs", method = "spearman"))
+# In heatmap red cells are low correlated and white and yellow high correlated
+# But, It's look like uncertain. Let`s try another way
+
+
+# Make principal component analisys
+PCA <- prcomp(na.omit(AQ_rob[,-(1:2)]))
+
+# Look at variance per PCs
+PCA$sdev <- data.frame(1:length(PCA$sdev),PCA$sdev)
+
+colnames(PCA$sdev) <- c("PC", "sdev")
+
+ggplot(PCA$sdev, aes(x = PC, y = sdev)) + geom_line() + geom_point()
+
+# Look at PCs histograms. 
+gather(data.frame(PCA$x)) %>% ggplot(aes(x = value)) +
+  geom_histogram() +
+  facet_wrap(~key)
+
+
+# Ok. I don't fully understand, but it's matrix which consist of eigenvalues
+# which correspond to old variables.
+# And it's linear transformation above our data during evaluation new variables 
+# in PCA$x
+
+PCA$rotation <- data.frame(PCA$rotation)
+PCA$rotation$old_var <- rownames(PCA$rotation)
+
+# each point is a variable. and distances can be interpreted as correlation
+# between variables. If we think about it, we can see that almost all variables
+# (except PT08.S3.NOx) grouped pretty close each other.
+# Most likely it's relevant, because in practice wastes don't pollute enivorment
+# separately
+ggplot(PCA$rotation, aes(x = PC1, y = PC2, color = old_var, label = old_var)) +
+  geom_point(size = 0.1) + geom_text(size = 3)
+
+```
+
+```{r regressions, warning=FALSE, message=FALSE}
+# CO
+
+ggplot(AQ_rob, aes(x = PT08.S1.CO., y = C6H6.GT.)) + geom_point()
+# Create linear model
+PT08.S1.CO <- lm(C6H6.GT. ~ PT08.S1.CO., AQ_rob)
+# check distribution of residuals
+ggplot(data.frame(PT08.S1.CO$residuals),
+       aes(x = PT08.S1.CO.residuals)) + geom_histogram()
+
+
+ggplot(AQ_rob, aes(x = CO.GT., y = C6H6.GT.)) + geom_point()
+
+CO.GT <- lm(C6H6.GT. ~ CO.GT., AQ_rob)
+
+ggplot(data.frame(CO.GT$residuals), aes(x = CO.GT.residuals)) + geom_histogram()
+
+# NO2
+
+ggplot(AQ_rob, aes(x = PT08.S4.NO2., y = C6H6.GT.)) + geom_point()
+
+PT08.S4.NO2 <- lm(C6H6.GT. ~ PT08.S4.NO2., AQ_rob)
+
+ggplot(data.frame(PT08.S4.NO2$residuals),
+       aes(x = PT08.S4.NO2.residuals)) + geom_histogram()
+
+
+ggplot(AQ_rob, aes(x = NO2.GT., y = C6H6.GT.)) + geom_point()
+
+NO2.GT <- lm(C6H6.GT. ~ NO2.GT., AQ_rob)
+
+ggplot(data.frame(NO2.GT$residuals),
+       aes(x = NO2.GT.residuals)) + geom_histogram()
+
+
+
+# NMHC - Non-Methane Hydrocarbons
+# points perfectly formed some curve
+ggplot(AQ_rob, aes(x = PT08.S2.NMHC., y = C6H6.GT.)) + geom_point() 
+
+PT08.S2.NMHC <- lm(C6H6.GT. ~ PT08.S2.NMHC., AQ_rob)
+
+ggplot(data.frame(PT08.S2.NMHC$residuals),
+       aes(x = PT08.S2.NMHC$residuals)) + geom_histogram()
+
+# Here we have heteroscedastisity. Maybe because of NMHC heterogenety(is not one compound)
+
+ggplot(AQ_rob, aes(x = NMHC.GT., y = C6H6.GT.)) + geom_point()
+
+NMHC.GT <- lm(C6H6.GT. ~ NMHC.GT., AQ_rob)
+
+ggplot(data.frame(NMHC.GT$residuals),
+       aes(x = NMHC.GT$residuals)) + geom_histogram()
+
+
+# NOx
+ggplot(AQ_rob, aes(x = PT08.S3.NOx., y = C6H6.GT.)) + geom_point()
+
+PT08.S3.NOx <- lm(C6H6.GT. ~ PT08.S3.NOx., AQ_rob)
+
+ggplot(data.frame(PT08.S3.NOx$residuals),
+       aes(x = PT08.S3.NOx$residuals)) + geom_histogram()
+
+
+ggplot(AQ_rob, aes(x = NOx.GT., y = C6H6.GT.)) + geom_point()
+
+NOx.GT <- lm(C6H6.GT. ~ NOx.GT., AQ_rob)
+
+ggplot(data.frame(NOx.GT$residuals),
+       aes(x = NOx.GT$residuals)) + geom_histogram()
+
+
+# humidity and temperature
+
+ggplot(AQ_rob, aes(x = AH, y = C6H6.GT.)) + geom_point()
+
+AH <- lm(C6H6.GT. ~ AH, AQ_rob)
+
+ggplot(data.frame(AH$residuals),
+       aes(x = AH$residuals)) + geom_histogram()
+
+
+ggplot(AQ_rob, aes(x = RH, y = C6H6.GT.)) + geom_point()
+
+RH <- lm(C6H6.GT. ~ RH, AQ_rob)
+
+ggplot(data.frame(RH$residuals),
+       aes(x = RH$residuals)) + geom_histogram()
+
+
+ggplot(AQ_rob, aes(x = `T`, y = C6H6.GT.)) + geom_point()
+
+Temperature <- lm(C6H6.GT. ~ `T`, AQ_rob)
+
+ggplot(data.frame(Temperature$residuals),
+       aes(x = Temperature$residuals)) + geom_histogram()
+
+
+```
+
+```{r train_test_sets, , warning=FALSE, message=FALSE}
+# Choose C6H6.GT. ~ NMHC.GT. and C6H6.GT. ~ CO.GT.
+
+# Make Subset which correspond train\test dataset
+
+lm_data <- na.omit(AQ_rob)
+# separate vector
+sep <- sample(c(F,T), nrow(lm_data), replace = T)
+
+test <- lm_data[sep,]
+# keep only target colmuns
+
+
+train <- lm_data[!sep,]
+
+# keep only target colmuns
+reg_train <- data.frame(train$CO.GT., train$NMHC.GT.,
+                        train$C6H6.GT.)
+
+colnames(reg_train) <- c("CO.GT.","NMHC.GT.","C6H6.GT.")
+
+# add cor.stat
+reg_CO <- lm(C6H6.GT. ~ CO.GT., reg_train)
+reg_CO$stat <- cor.test(reg_train$C6H6.GT., reg_train$CO.GT.)
+reg_NMHC <- lm(C6H6.GT. ~ NMHC.GT., reg_train)
+reg_NMHC$stat <- cor.test(reg_train$C6H6.GT., reg_train$NMHC.GT.)
+
+# make a test for CO and NMHC
+reg_test_CO <- data.frame(test$CO.GT., 
+                          test$C6H6.GT.)
+
+colnames(reg_test_CO) <- c("CO.GT.","C6H6.GT.")
+reg_test_NMHC <- data.frame(test$NMHC.GT.,
+                            test$C6H6.GT.)
+
+colnames(reg_test_NMHC) <- c("NMHC.GT.", "C6H6.GT.")
+
+
+predicted <- function(var,model){ 
+  sapply(var, function(x) model$coefficients[1] + 
+           model$coefficients[2] * x)
+}
+
+reg_test_NMHC$predicted <- predicted(reg_test_NMHC$NMHC.GT., reg_NMHC)
+reg_test_CO$predicted <- predicted(reg_test_CO$CO.GT., reg_CO)
+
+# plot for NMHC
+
+gather(reg_test_NMHC, "Y_type","value", -NMHC.GT.) %>% 
+  ggplot(aes(x = NMHC.GT., y = value, color = Y_type)) +
+  geom_abline(slope = reg_NMHC$coefficients[2],
+              intercept = reg_NMHC$coefficients[1]) + geom_point() + 
+  ylab("C6H6.GT") + ggtitle(paste("R2", round(reg_NMHC$stat$estimate^2, 3),
+                                  sep = ": "),
+                            paste("pvalue", reg_NMHC$stat$p.value, sep = ": "))
+
+
+# plot for CO
+
+gather(reg_test_CO, "Y_type","value", -CO.GT.) %>% 
+  ggplot(aes(x = CO.GT., y = value,
+             color = Y_type)) +
+  geom_abline(slope = reg_CO$coefficients[2],
+              intercept = reg_CO$coefficients[1]) + geom_point() + 
+  ylab("C6H6.GT") + ggtitle(paste("R2", round(reg_CO$stat$estimate^2, 3),
+                                  sep = ": "),
+                            paste("pvalue", reg_CO$stat$p.value, sep = ": "))
+
+```
