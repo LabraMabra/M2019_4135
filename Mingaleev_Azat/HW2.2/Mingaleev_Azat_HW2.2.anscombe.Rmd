@@ -1,0 +1,62 @@
+---
+title: "Anscombe"
+author: "Azat"
+date: '3 апреля 2020 г '
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r load_libs, warning=FALSE, message=FALSE}
+setwd("~/R_data_analyze/")
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+```
+
+```{r data_transform, warning=FALSE, message=FALSE}
+anscombe_long <- gather(anscombe)
+x <- filter(anscombe_long, grepl("x", key))$value
+y <- filter(anscombe_long, grepl("y", key))$value
+f <- as.factor(c(rep(1,11),rep(2,11),rep(3,11),rep(4,11)))
+
+transformed_anscombe <- data.frame(f,x,y)
+
+transformed_anscombe %>% group_by(f) %>% summarise(mean(x),sd(x),
+                                                   mean(y),sd(y))
+```
+```{r cor_stat, warning=FALSE, message=FALSE}
+cor_stat <- group_by(transformed_anscombe, f) %>% summarise(cor.test(x, y,
+                                                                     method = "pearson")$statistic,
+                                                            cor.test(x, y, 
+                                                                     method = "pearson")$p.value,
+                                                            cor.test(x, y, 
+                                                                     method = "kendall")$statistic,
+                                                            cor.test(x, y, 
+                                                                     method = "kendall")$p.value,
+                                                            cor.test(x, y, 
+                                                                     method = "spearman")$statistic,
+                                                            cor.test(x, y, 
+                                                                     method = "spearman")$p.value
+                                                            
+                                                            
+)
+
+colnames(cor_stat) <- c("f", "pearson_stat", "pearson_p.vaule",
+                        "kendall_stat", "kendall_p.vaule",
+                        "spearman_stat", "spearman_p.vaule")
+
+cor_stat
+```
+
+
+```{r plot_anscombe, warning=FALSE, message=FALSE}
+transformed_anscombe %>% ggplot(aes(x = x,
+                                    y = y,
+                                    color = f)) +
+  geom_point() + geom_smooth(method = "lm") +
+  facet_grid(. ~f)
+```
