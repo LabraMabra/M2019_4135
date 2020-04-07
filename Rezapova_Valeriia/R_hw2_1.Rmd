@@ -1,0 +1,312 @@
+---
+title: "Homework2_1"
+author: "Valeriia"
+date: "31 03 2020"
+output: pdf_document
+---
+
+```{r message=FALSE, warning=FALSE}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(ggplot2)
+library(reshape2)
+library(data.table)
+```
+
+## First task
+Import data and make it long
+
+```{r}
+ans <- datasets::anscombe
+ansl <- data.frame(
+    group  = rep(1:4, each = 11),
+    x = unlist(ans[,c(1:4)]),
+    y = unlist(ans[,c(5:8)])
+    )
+rownames(ansl) <- NULL
+ansl
+```
+
+Build a plot
+
+```{r}
+ggplot(ansl, aes(x=x, y=y)) + geom_point()+facet_grid(.~group)
+```
+
+Correlation and mean, sd.
+
+```{r message=FALSE}
+ansl %>% 
+  group_by(group) %>% 
+  summarise_each(funs(mean, sd))
+ansl %>% 
+  group_by(group) %>%
+  summarise_at(vars(-y),funs(cor_pears=cor(x, y, method = c("pearson")), cor_spear=cor(x, y, method = c("spearman")), cor_kendall=cor(x, y, method = c("kendall"))))
+```
+Plots
+
+```{r}
+ggplot(ansl, aes(x=x, y=y)) + geom_point()+facet_grid(.~group)+geom_smooth(method = lm)
+```
+
+## Second task
+
+Import data
+
+```{r}
+air <- read.csv("Air.csv", sep=";", dec=",")
+air <- air[,-c(16, 17)]
+air <- air[rowSums(is.na(air[,13:15]))==0,]
+```
+
+Make it long and check data.
+We can see outliers in -200 - replace it with NA drop it. Why drop? Because it probably means NA, also we can see it in the several columns in the same row, so this data will make our life harder in regression.
+Also we can notice that not all columns have normal distribution
+
+```{r}
+air_long <- melt(air)
+air_long <- air_long[,-c(1,2)]
+ggplot(air_long, aes(value)) + 
+  geom_histogram() + 
+  facet_wrap(~variable, scales = "free")
+
+ggplot(air_long, aes(value)) + 
+  geom_boxplot() + 
+  facet_wrap(~variable)
+
+for (i in 3:ncol(air)) {
+  air[,i][which(air[,i] == -200)] <- NA
+}
+
+air <- drop_na(air)
+
+air_long <- melt(air)
+air_long <- air_long[,-c(1,2)]
+ggplot(air_long, aes(value)) + 
+  geom_histogram() + 
+  facet_wrap(~variable, scales = "free")
+
+ggplot(air_long, aes(value)) + 
+  geom_boxplot() + 
+  facet_wrap(~variable)
+```
+
+Check our data. Quantile - the proportion of cases that are less than certain values. If the requirements of "normality" are here - the data should lie on a diagonal line.
+We can see that several columns do not have normal distribution.
+
+```{r}
+#CO.GT
+qqnorm(air$CO.GT., pch = 1, frame = FALSE)
+qqline(air$CO.GT., col = "steelblue", lwd = 2)
+#PT08.S1.CO
+qqnorm(air$PT08.S1.CO., pch = 1, frame = FALSE)
+qqline(air$PT08.S1.CO., col = "steelblue", lwd = 2)
+#NMHC.GT
+qqnorm(air$NMHC.GT., pch = 1, frame = FALSE)
+qqline(air$NMHC.GT., col = "steelblue", lwd = 2)
+#C6H6.GT
+qqnorm(air$C6H6.GT., pch = 1, frame = FALSE)
+qqline(air$C6H6.GT., col = "steelblue", lwd = 2)
+#PT08.S2.NMHC
+qqnorm(air$PT08.S2.NMHC., pch = 1, frame = FALSE)
+qqline(air$PT08.S2.NMHC., col = "steelblue", lwd = 2)
+#NOx.GT
+qqnorm(air$NOx.GT., pch = 1, frame = FALSE)
+qqline(air$NOx.GT., col = "steelblue", lwd = 2)
+#PT08.S3.NOx
+qqnorm(air$PT08.S3.NOx., pch = 1, frame = FALSE)
+qqline(air$PT08.S3.NOx., col = "steelblue", lwd = 2)
+#NO2.GT
+qqnorm(air$NO2.GT., pch = 1, frame = FALSE)
+qqline(air$NO2.GT., col = "steelblue", lwd = 2)
+#PT08.S4.NO2
+qqnorm(air$PT08.S4.NO2., pch = 1, frame = FALSE)
+qqline(air$PT08.S4.NO2., col = "steelblue", lwd = 2)
+#PT08.S5.O3
+qqnorm(air$PT08.S5.O3., pch = 1, frame = FALSE)
+qqline(air$PT08.S5.O3., col = "steelblue", lwd = 2)
+#T
+qqnorm(air$T, pch = 1, frame = FALSE)
+qqline(air$T, col = "steelblue", lwd = 2)
+#RH
+qqnorm(air$RH, pch = 1, frame = FALSE)
+qqline(air$RH, col = "steelblue", lwd = 2)
+#AH
+qqnorm(air$AH, pch = 1, frame = FALSE)
+qqline(air$AH, col = "steelblue", lwd = 2)
+```
+
+Cross correlation. Red - high correlation, white - low.
+
+```{r}
+ccs <- as.matrix(air[,c(3:15)])
+heatmap(cor(ccs,use = "complete.obs", method = "spearman"))
+cor(ccs, use = "complete.obs", method = "spearman")
+```
+
+Response C6H6.GT. 
+
+```{r}
+air%>%
+   lm(data = ., C6H6.GT. ~ CO.GT.)%>%
+  summary()
+air%>%
+   ggplot(aes(x = CO.GT., y = C6H6.GT.))+
+  geom_point()+
+  geom_smooth(method = lm)
+
+air%>%
+   lm(data = ., C6H6.GT. ~ PT08.S1.CO.)%>%
+  summary()
+air%>%
+   ggplot(aes(x = PT08.S1.CO., y = C6H6.GT.))+
+  geom_point()+
+  geom_smooth(method = lm)
+
+air%>%
+   lm(data = ., C6H6.GT. ~ NMHC.GT.)%>%
+  summary()
+air%>%
+   ggplot(aes(x = NMHC.GT., y = C6H6.GT.))+
+  geom_point()+
+  geom_smooth(method = lm)
+
+air%>%
+   lm(data = ., C6H6.GT. ~ PT08.S2.NMHC.)%>%
+  summary()
+air%>%
+   ggplot(aes(x = PT08.S2.NMHC., y = C6H6.GT.))+
+  geom_point()+
+  geom_smooth(method = lm)
+
+air%>%
+   lm(data = ., C6H6.GT. ~ NOx.GT.)%>%
+  summary()
+air%>%
+   ggplot(aes(x = NOx.GT., y = C6H6.GT.))+
+  geom_point()+
+  geom_smooth(method = lm)
+
+air%>%
+   lm(data = ., C6H6.GT. ~ PT08.S3.NOx.)%>%
+  summary()
+air%>%
+   ggplot(aes(x = PT08.S3.NOx., y = C6H6.GT.))+
+  geom_point()+
+  geom_smooth(method = lm)
+
+air%>%
+   lm(data = ., C6H6.GT. ~ NO2.GT.)%>%
+  summary()
+air%>%
+   ggplot(aes(x = NO2.GT., y = C6H6.GT.))+
+  geom_point()+
+  geom_smooth(method = lm)
+
+air%>%
+   lm(data = ., C6H6.GT. ~ PT08.S4.NO2.)%>%
+  summary()
+air%>%
+   ggplot(aes(x = PT08.S4.NO2., y = C6H6.GT.))+
+  geom_point()+
+  geom_smooth(method = lm)
+
+air%>%
+   lm(data = .,C6H6.GT.  ~ PT08.S5.O3.)%>%
+  summary()
+air%>%
+   ggplot(aes(x = PT08.S5.O3., y = C6H6.GT.))+
+  geom_point()+
+  geom_smooth(method = lm)
+
+air%>%
+   lm(data = .,C6H6.GT. ~ `T`)%>%
+  summary()
+air%>%
+   ggplot(aes(x = `T`, y = C6H6.GT.))+
+  geom_point()+
+  geom_smooth(method = lm)
+
+air%>%
+   lm(data = ., C6H6.GT. ~ RH)%>%
+  summary()
+air%>%
+   ggplot(aes(x = RH, y = C6H6.GT.))+
+  geom_point()+
+  geom_smooth(method = lm)
+
+air%>%
+   lm(data = ., C6H6.GT. ~ AH)%>%
+  summary()
+air%>%
+   ggplot(aes(x = AH, y = C6H6.GT.))+
+  geom_point()+
+  geom_smooth(method = lm)
+```
+
+I've choosed benzoate dependence on CO and on tin oxide.
+Separated data in 75:25%
+We can see that R^2 is close to 1 which says about linear dependence. P-value is close to 0 - independent variables explain the dynamics of the dependent variable.
+
+```{r}
+set.seed(2)
+sep <- sample.int(n = nrow(air), size = floor(.75*nrow(air)))
+train <- air[sep,]
+test <- air[-sep,]
+
+train1 <- train[,c('C6H6.GT.', 'CO.GT.')]
+
+test1 <- test[,c('C6H6.GT.', 'CO.GT.')]
+
+mod1 <- lm(data = train1,C6H6.GT. ~ CO.GT.)
+
+a1 <- summary(mod1)
+a1
+a1$stat <- cor.test(train1$CO.GT., train1$C6H6.GT.)
+pred1 <- predict(mod1, newdata = test1)
+head(pred1)
+test1$C6H6.GT._pred <- pred1
+head(test1)
+
+test1 <- rbindlist(list(test1[,c(2, 1)], test1[,c(2,3)]))
+
+train1$type <- 'train'
+test1$type <- 'test'
+test1[1:(nrow(test1)/2),3] <- 'real'
+all <- rbind(train1, test1)
+
+ggplot(data = all, aes(x = CO.GT., y = C6H6.GT., color = type))+
+  geom_smooth(method = 'lm', color = 'black')+
+  ggtitle(paste("R2", round(a1$r.squared, 3),
+                                  sep = ": "),
+                            paste("pvalue", a1$stat$p.value, sep = ": "))+
+  geom_point()
+
+train2 <- train[,c('PT08.S1.CO.', 'C6H6.GT.')]
+test2 <- test[,c('PT08.S1.CO.', 'C6H6.GT.')]
+mod2 <- lm(data = train2, C6H6.GT.~PT08.S1.CO.)
+a2 <- summary(mod2)
+a2
+a2$stat <- cor.test(train2$PT08.S1.CO., train2$C6H6.GT.)
+
+pred2 <- predict(mod2, newdata = test2)
+head(pred2)
+test2$C6H6.GT._pred <- pred2
+head(test2)
+
+test2 <- rbindlist(list(test2[,c(1,2)], test2[,c(1,3)]))
+
+train2$type <- 'train'
+test2$type <- 'test'
+test2[1:(nrow(test2)/2),3] <- 'real'
+all2 <- rbind(train2[,c(2,1,3)], test2)
+
+ggplot(data = all2, aes(x = PT08.S1.CO., y = C6H6.GT., color = type))+
+  geom_smooth(method = 'lm', color = 'black')+
+  ggtitle(paste("R2", round(a2$r.squared, 3),
+                                  sep = ": "),
+                            paste("pvalue", a2$stat$p.value, sep = ": "))+
+   geom_point()
+```
+```
