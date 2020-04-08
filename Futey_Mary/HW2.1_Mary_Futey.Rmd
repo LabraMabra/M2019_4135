@@ -1,0 +1,453 @@
+---
+title: "HW2.1_Mary_Futey"
+author: "Mary Futey"
+date: "4/3/2020"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r Libraries, include=FALSE}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(magrittr)
+library(plyr)
+library(reshape2)
+library(corrplot)
+library(data.table)
+```
+
+## Part 1: Anscombe’s dataset
+*Scatter plot facetted by set
+
+```{r Ans facet}
+knitr::kable(anscombe)
+anscombe.1 <- data.frame(x = anscombe[["x1"]], 
+                         y = anscombe[["y1"]], 
+                         Set = "Anscombe Set 1")
+anscombe.2 <- data.frame(x = 
+                           anscombe[["x2"]], 
+                         y = anscombe[["y2"]], 
+                         Set = "Anscombe Set 2")
+anscombe.3 <- data.frame(x = anscombe[["x3"]], 
+                         y = anscombe[["y3"]], 
+                         Set = "Anscombe Set 3")
+anscombe.4 <- data.frame(x = anscombe[["x4"]], 
+                         y = anscombe[["y4"]], 
+                         Set = "Anscombe Set 4")
+anscombe.data <- rbind(anscombe.1, anscombe.2, anscombe.3, anscombe.4)
+
+ans_facet <- ggplot(anscombe.data, 
+                    aes(x = x, 
+                        y = y))+ 
+  geom_point(color = "black")+ 
+  facet_wrap(~Set, ncol = 2)
+
+ans_facet
+
+```
+
+*Summary calculation (mean, sd) grouped by set
+
+```{r Ans mean and sd}
+
+aggregate(cbind(x, y) ~ Set, anscombe.data, mean)
+aggregate(cbind(x, y) ~ Set, anscombe.data, sd)
+
+```
+
+*Pearson’s correlation by set, and non-parametric, and p-value 
+
+```{r Ans Pearsons, non-parametric, pval}
+
+correlation <- function(data) {
+  a <- data.frame(pearson = cor.test(data$x, data$y, method = "pearson")$statistic)
+  b <- data.frame(p_pearson = cor.test(data$x, data$y, method = "pearson")$p.value) 
+  c <- data.frame(kendall = cor.test(data$x, data$y, method = "kendall")$statistic)
+  d <- data.frame(p_kendall = cor.test(data$x, data$y, method = "kendall")$p.value)
+  e <- data.frame(spearman = cor.test(data$x, data$y, method = "spearman")$statistic)
+  f <- data.frame(p_spearman = cor.test(data$x, data$y, method = "spearman")$p.value) 
+    
+  return(list(a, b, c, d, e, f))
+}
+
+res <- correlation(anscombe.data)
+ldply(res)
+
+
+
+```
+*Add geom_smooth()totheplot
+
+```{r Ans plot with geom_smooth}
+ans_smooth <- ans_facet + 
+  geom_smooth(formula = y ~ x, method = "lm", se = FALSE, data = anscombe.data)
+ans_smooth
+
+```
+
+## Air Quality dataset
+
+* Explore data set, clean if needed: convert date and time to factor, check for NAs, switch comma to decimal
+* Explore each variable independently: remove "-200" values as they are not possible / erroneous 
+
+```{r Air Q load, explore and clean}
+airq <- read.csv("/Users/maryfutey/desktop/AirQualityUCI/AirQualityUCI.csv", 
+                 header = TRUE,
+                 dec=",")
+head(airq)
+
+airq_long <- gather(airq, key="measurement", value="value", -c(Date,Time))
+
+airq_long$Date <- as.factor(airq_long$Date)
+airq_long$Time <- as.factor(airq_long$Time)
+airq_long$measurement <- as.factor(airq_long$measurement)
+
+airq_fil <- airq_long %>% 
+  filter_all(all_vars(. != -200))
+
+head(airq_fil)
+colSums(is.na(airq_fil))
+
+p1 <- airq_fil %>% ggplot(aes(x = value)) +
+  geom_histogram() +
+  facet_wrap(~measurement, scales = "free")
+
+p1
+
+
+```
+
+
+* Need to normalize data
+
+```{r Air Q norm}
+airq_wide <- spread(airq_fil, key = "measurement" ,value = "value")
+airq_wide <- na.omit(airq_wide)
+
+norm <- function(x) {
+    (x - min(x)) / (max(x) - min(x))
+  }
+
+airq_norm <- as.data.frame(lapply(airq_wide[3:15], norm))
+airq_norm$Date <- airq_wide$Date
+airq_norm$Time <- airq_wide$Time
+
+
+airq_norm_long <- gather(airq_norm, key = "measurement", value = "value", -c(Date, Time))
+
+p2 <- airq_norm_long %>%  ggplot(aes(x = value)) +
+  geom_histogram() +
+  facet_wrap(~measurement, scales = "free")
+ 
+p2
+
+```
+
+
+* Cross correlations
+
+```{r Air Q cross coor}
+airq_sub <- airq_norm[, 1:13]
+colnames(airq_sub) <- c(
+  "Abs H",
+  "C6H6",
+  "CO",
+  "NMHC",
+  "NO2",
+  "NOx",
+  "S1.CO",
+  "S2.NMHC",
+  "S3.NOx",
+  "S4.NO2",
+  "S5.O3",
+  "Rel H", 
+  "Temp"
+)
+
+airq_cor <- round(cor(airq_sub, method = "kendall"),2)
+
+#reorder, create upper triangle
+reorder_airq_cor <- function(airq_cor){
+  # Use correlation between variables as distance
+  dd <- as.dist((1-airq_cor)/2)
+  hc <- hclust(dd)
+  airq_cor <-airq_cor[hc$order, hc$order]
+}
+
+get_upper_tri <- function(airq_cor){
+  airq_cor[lower.tri(airq_cor)]<- NA
+  return(airq_cor)
+}
+
+airq_cor <- reorder_airq_cor(airq_cor)
+upper_tri <- get_upper_tri(airq_cor)
+melt_uppertri <- melt(upper_tri, na.rm = TRUE)
+
+p3 <- ggplot(melt_uppertri, 
+             aes(Var2, Var1, 
+                 fill = value)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
+                       midpoint = 0, limit = c(-1,1), space = "Lab", 
+                       name="Kendall\nCorrelation") +
+  ggtitle("Correlation Matrix for Air Quality Dataset") +
+  theme_minimal() + 
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, 
+                                   size = 7, hjust = 1)) +
+  coord_fixed() +
+  geom_text(aes(Var2, 
+                Var1, 
+                label = value), 
+            color = "black", size = 2.8) +
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.border = element_blank(),
+    panel.background = element_blank(),
+    axis.ticks = element_blank(),
+    legend.justification = c(1, 0),
+    legend.position = c(0.6, 0.7),
+    legend.direction = "horizontal")+
+  guides(fill = guide_colorbar(barwidth = 7, barheight = 1,
+                               title.position = "top", title.hjust = 0.5))
+
+p3
+
+
+
+p4 <- corrplot.mixed(airq_cor, 
+                     tl.col = "black", tl.cex = 0.6,
+                     lower.col = "black", number.cex = 0.7)
+
+p4
+```
+
+
+* Build simple linear models with each predictor, check assumptions, response C6H6
+
+
+#Absolute humidity - data not linear
+```{r Air Q AH}
+ggplot(airq_norm, aes(x = AH,
+                   y = C6H6.GT.)) +
+  geom_point() +
+  ggtitle("C6H6.GT. vs absolute humidity")
+AH <- lm(C6H6.GT. ~ AH, airq_norm)
+residuals(AH) %>% hist(main = "residuals absolute humidity")
+summary(AH)
+
+```
+
+#Ave CO  (CO.GT.)
+
+```{r Air Q CO}
+ggplot(airq_norm, aes(x = CO.GT.,
+                   y = C6H6.GT.)) +
+  geom_point() +
+  ggtitle("C6H6.GT. vs Ave CO")
+
+CO <- lm(C6H6.GT. ~ CO.GT., airq_norm)
+residuals(CO) %>% hist(main = "residuals ave CO")
+summary(CO)
+
+```
+
+#Non Metanic HydroCarbons (NMHC.GT.)
+
+```{r Air Q NMHC}
+ggplot(airq_norm, aes(x = NMHC.GT.,
+                   y = C6H6.GT.)) +
+  geom_point() +
+  ggtitle("C6H6.GT. vs Non Metanic HydroCarbons")
+
+NMHC <- lm(C6H6.GT. ~ NMHC.GT., airq_norm)
+residuals(NMHC) %>% hist(main = "residuals Non Metanic HydroCarbons")
+summary(NMHC)
+```
+
+#ave NO2 (NO2.GT.)
+```{r Air Q NO2}
+ggplot(airq_norm, aes(x = NO2.GT.,
+                   y = C6H6.GT.)) +
+  geom_point() +
+  ggtitle("C6H6.GT. vs averaged NO2")
+
+NO2 <- lm(C6H6.GT. ~ NO2.GT., airq_norm)
+residuals(NO2) %>% hist(main = "residuals ave NO2")
+summary(NO2)
+```
+
+#ave NOx (NO2.GT.)
+```{r Air Q NOx}
+ggplot(airq_norm, aes(x = NOx.GT.,
+                   y = C6H6.GT.)) +
+  geom_point() +
+  ggtitle("C6H6.GT. vs averaged NOx")
+
+NOx <- lm(C6H6.GT. ~ NOx.GT., airq_norm)
+residuals(NOx) %>% hist(main = "residuals ave NOx")
+summary(NOx)
+```
+
+#ave tin oxide (PT08.S1.CO.)
+```{r Air Q PT08.S1}
+ggplot(airq_norm, aes(x = PT08.S1.CO.,
+                   y = C6H6.GT.)) +
+  geom_point() +
+  ggtitle("C6H6.GT. vs tin oxide / PT08.S1.CO.")
+
+PT08.S1 <- lm(C6H6.GT. ~ PT08.S1.CO., airq_norm)
+residuals(PT08.S1) %>% hist(main = "residuals tin oxide")
+summary(PT08.S1)
+```
+
+#ave titania (PT08.S2.NMHC)
+```{r Air Q PT08.S2}
+ggplot(airq_norm, aes(x = PT08.S2.NMHC.,
+                   y = C6H6.GT.)) +
+  geom_point() +
+  ggtitle("C6H6.GT. vs titania / PT08.S2.NMHC")
+
+PT08.S2 <- lm(C6H6.GT. ~ PT08.S2.NMHC., airq_norm)
+residuals(PT08.S2) %>% hist(main = "residuals ave titania")
+summary(PT08.S2)
+```
+#ave tungsten oxide NOx targeted (PT08.S3.NOx.) - data not linear
+```{r Air Q PT08.S3}
+ggplot(airq_norm, aes(x = PT08.S3.NOx.,
+                   y = C6H6.GT.)) +
+  geom_point() +
+  ggtitle("C6H6.GT. vs tungsten oxide NOx / PT08.S3.NOx.")
+
+PT08.S3 <- lm(C6H6.GT. ~ PT08.S3.NOx., airq_norm)
+residuals(PT08.S3) %>% hist(main = " residuals tungsten oxide NOx")
+summary(PT08.S3)
+```
+#ave tungsten oxide NO2 targeted (PT08.S4.NO2.) 
+```{r Air Q PT08.S4}
+ggplot(airq_norm, aes(x = PT08.S4.NO2.,
+                   y = C6H6.GT.)) +
+  geom_point() +
+  ggtitle("C6H6.GT. vs tungsten oxide NO2 / PT08.S4.NO2")
+
+PT08.S4 <- lm(C6H6.GT. ~ PT08.S4.NO2., airq_norm)
+residuals(PT08.S4) %>% hist(main = " residuals tungsten oxide NO2")
+summary(PT08.S4)
+```
+#ave indium oxide (PT08.S5.O3.)
+```{r Air Q PT08.S5}
+ggplot(airq_norm, aes(x = PT08.S5.O3.,
+                   y = C6H6.GT.)) +
+  geom_point() +
+  ggtitle("C6H6.GT. vs indium oxide / PT08.S5.O3")
+
+PT08.S5 <- lm(C6H6.GT. ~ PT08.S5.O3., airq_norm)
+residuals(PT08.S5) %>% hist(main = "residuals ave indium oxide")
+summary(PT08.S5)
+```
+
+#Relative humidity (RH) - data not linear
+```{r Air Q RH}
+ggplot(airq_norm, aes(x = RH,
+                   y = C6H6.GT.)) +
+  geom_point() +
+  ggtitle("C6H6.GT. vs Relative humidity")
+
+RH <- lm(C6H6.GT. ~ RH, airq_norm)
+residuals(RH) %>% hist(main = "residuals relative humidity")
+summary(RH)
+```
+
+#Temperature
+```{r Air Q T}
+ggplot(airq_norm, aes(x = T,
+                   y = T)) +
+  geom_point() +
+  ggtitle("C6H6.GT. vs Temperature")
+
+TP <- lm(C6H6.GT. ~ T, airq_norm)
+residuals(TP) %>% hist(main = "residuals temperature")
+summary(TP)
+
+```
+
+
+* For 2-3 of the models create train-test sets, plot the model, for the test set color real and predicted points differently; R^2 and p-value to title
+
+```{r Air Q train test}
+
+#ave CO and NO2
+set.seed(88)
+data <- airq_norm
+sample <- sample.int(n = nrow(data), size = floor(.75*nrow(data)))
+train <- data[sample, ]
+test <- data[-sample, ]
+
+train_CO <- train[,c("C6H6.GT.", "CO.GT." )]
+test_CO <- test[,c("C6H6.GT.", "CO.GT." )]
+new_mod_CO <- lm(data = train_CO, 
+              C6H6.GT. ~ CO.GT.)
+
+
+#summary
+sum_CO <- summary(new_mod_CO)
+print(sum_CO)
+
+#use model, predicts new model from newdata (test)
+#predictions for new test data set, add new column
+pred_CO <- predict(new_mod_CO, newdata = test_CO)
+test$CO.GT._pred <- pred_CO 
+
+
+#make combined dataset
+train_CO$data <- "train"
+test_CO$data <- "test"
+test_CO[1:(nrow(test_CO)/2),3] <- "real"
+comb_CO <- rbind(train_CO, test_CO)
+
+#trained and test should be similar shape
+ggplot(data = comb_CO,
+       aes(x = CO.GT.,
+           y = C6H6.GT.,
+           color = data)) +
+  geom_point() +
+  geom_smooth(method = "lm", 
+              color = "black") +
+  ggtitle(paste("R2", round(sum_CO$r.squared, 3),
+                sep = ": "),
+          paste("pvalue <2e-16" ))
+
+#same for NO2
+train_NO2 <- train[,c("C6H6.GT.", "NO2.GT." )]
+test_NO2 <- test[,c("C6H6.GT.", "NO2.GT." )]
+mod_NO2 <- lm(data = train_NO2, 
+              C6H6.GT. ~ NO2.GT.)
+
+sum_NO2 <- summary(mod_NO2)
+print(sum_NO2)
+
+pred_NO2 <- predict(mod_NO2, newdata = test_NO2)
+test$NO2.GT._pred <- pred_NO2
+
+train_NO2$data <- "train"
+test_NO2$data <- "test"
+test_NO2[1:(nrow(test_NO2)/2),3] <- "real"
+comb_NO2 <- rbind(train_NO2, test_NO2)
+
+ggplot(data = comb_NO2,
+       aes(x = NO2.GT.,
+           y = C6H6.GT.,
+           color = data)) +
+  geom_point() +
+  geom_smooth(method = "lm", 
+              color = "black") +
+  ggtitle(paste("R2", round(sum_CO$r.squared, 3),
+                sep = ": "),
+          paste("pvalue <2e-16" ))
