@@ -1,0 +1,150 @@
+---
+title: "2_1"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r libraries}
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library(corrplot)
+```
+
+
+```{r anscombe, warning=FALSE}
+data <- anscombe
+names(data)[1:4] =c('1','2','3','4')
+data <- data %>% gather(X,value_x,1:4)
+names(data)[1:4] =c('1','2','3','4')
+data <- data  %>% gather(Y,value_y, 1:4)
+data <- data %>% filter(X==Y) 
+data %>%  ggplot(aes(value_x, y=value_y))+
+        geom_point()+
+        geom_smooth(method = "lm")+
+        facet_wrap(X~., scales = 'free')+
+        scale_x_continuous('X')+
+        scale_y_continuous('Y')
+data %>% group_by(X) %>% summarize(mean_x=mean(value_x),mean_y=mean(value_y),sd_x=sd(value_x),sd_y=sd(value_y))
+#data %>% group_by(X) %>% cor(data$value_x,data$value_y)
+cor <- data %>% group_by(X) %>% summarise(cor.test(value_x,value_y, method = "pearson")$statistic, cor.test(value_x,value_y, method = "kendall")$statistic, cor.test(value_x,value_y, method = "spearman")$statistic)
+colnames(cor) <- c("group", "pearson_cor","kendall_cor","spearman_cor")
+p_val <-  data %>% group_by(X) %>% summarise(cor.test(value_x,value_y, method = "pearson")$p.value, cor.test(value_x,value_y, method = "kendall")$p.value, cor.test(value_x,value_y, method = "spearman")$p.value)
+colnames(p_val) <- c("group", "pearson_p.val","kendall_p.val","spearman_p.val")
+cor
+p_val
+```
+
+
+```{r airquality, fig.width=100, fig.height=100}
+data <- read.table('AirQualityUCI.csv',header = T, sep=';', dec=',')
+data['X'] <- NULL
+data['X.1'] <- NULL
+data <- drop_na(data)
+data[, c(3,6,13:15)] <- sapply(data[, c(3,6,13:15)], as.numeric)
+#exclude data with -200 values
+data <- data %>% filter(CO.GT. !=-200) %>% filter(PT08.S1.CO.!=-200)  %>% filter(NMHC.GT.!=-200) %>% filter(PT08.S2.NMHC.!=-200)  %>% filter(PT08.S3.NOx. != -200)  %>% filter(PT08.S4.NO2. != -200)  %>% filter(PT08.S5.O3. != -200) %>% filter(NO2.GT. !=-200)  %>% filter(NOx.GT.!=-200)
+#log - transform to make dependency more linear
+data[, c(3:15)] <- sapply(data[, c(3:15)], function(x) log(x))
+#see the data
+pairs(data[,3:15], pch = 19,cex.labels=15,lower.panel=NULL)
+```
+
+```{r distridution}
+#lets see the distribution
+ggplot(gather(data[3:15], cols, value), aes(x = value)) + 
+       geom_histogram(binwidth = 0.05) + 
+       facet_wrap(cols~.,ncol=5,scale='free')
+```
+
+```{r correlation}
+#correlation matrix
+res <- cor(data[3:15],method='pearson')
+corrplot(res, type = "upper", 
+         tl.col = "black", tl.srt = 45)
+res <- cor(data[3:15],method='kendall')
+corrplot(res, type = "upper", 
+         tl.col = "black", tl.srt = 45)
+res <- cor(data[3:15],method='spearman')
+corrplot(res, type = "upper", 
+         tl.col = "black", tl.srt = 45)
+```
+```{r linear models}
+#linear models
+fit1 <- lm(data=data, C6H6.GT.~CO.GT.) 
+summary(fit1)$coefficients
+fit2 <- lm(data=data, C6H6.GT.~PT08.S1.CO.) 
+summary(fit2)$coefficients
+fit3 <- lm(data=data, C6H6.GT.~NMHC.GT.) 
+summary(fit3)$coefficients
+fit4 <- lm(data=data, C6H6.GT.~PT08.S2.NMHC.) 
+summary(fit4)$coefficients
+fit5 <- lm(data=data, C6H6.GT.~NOx.GT.) 
+summary(fit5)$coefficients
+fit6 <- lm(data=data, C6H6.GT.~PT08.S3.NOx.) 
+summary(fit6)$coefficients
+fit7 <- lm(data=data, C6H6.GT.~NO2.GT.) 
+summary(fit7)$coefficients
+fit8 <- lm(data=data, C6H6.GT.~PT08.S5.O3.) 
+summary(fit8)$coefficients
+fit9 <- lm(data=data, C6H6.GT.~T) 
+summary(fit9)$coefficients
+fit10 <- lm(data=data, C6H6.GT.~AH) 
+summary(fit10)$coefficients
+fit11 <- lm(data=data, C6H6.GT.~RH) 
+summary(fit11)$coefficients
+```
+
+```{r train set}
+#model one
+set.seed(42)
+sample <- sample.int(n=nrow(data),size=floor(0.75*nrow(data)))
+train <- data[sample,]
+test <- data[-sample,]
+r <- round(summary(fit1)$r.squared, 3)
+p <- round(summary(fit1)$coefficients[2,4],3)
+
+C6H6.GT_pred1 <- predict(fit1,test)
+test$C6H6.GT_pred1  <- C6H6.GT_pred1 
+ggplot(test,aes(x=CO.GT.,y=C6H6.GT_pred1))+
+  geom_point(col='blue')+
+  geom_point(aes(x=CO.GT.,y=C6H6.GT.,shape='test'), col='green')+
+  geom_smooth(aes(linetype='predict'))+
+  scale_x_continuous('CO.GT.')+
+  scale_y_continuous('C6H6.GT.')+
+  ggtitle(sprintf('r^2=%s',r),sprintf('p.value=%s',p))+
+  labs(shape = "",linetype="") 
+  
+#model two
+r <- round(summary(fit2)$r.squared,3)
+p <- round(summary(fit2)$coefficients[2,4],10)
+C6H6.GT_pred2 <- predict(fit2,test)
+test$C6H6.GT_pred2   <- C6H6.GT_pred2 
+ggplot(test,aes(x=PT08.S1.CO.,y=C6H6.GT_pred2))+
+  geom_point(col='blue')+
+  geom_point(aes(x=PT08.S1.CO.,y=C6H6.GT.,shape='test'), col='green')+
+  geom_smooth(aes(linetype='predict'))+
+  scale_x_continuous('PT08.S1.CO.')+
+  scale_y_continuous('C6H6.GT.')+
+  ggtitle(sprintf('r^2=%s',r),sprintf('p.value=%s',p))+
+  labs(shape = "",linetype="") 
+  
+#model three
+r <- round(summary(fit3)$r.squared,3)
+p <- round(summary(fit3)$coefficients[2,4],4)
+C6H6.GT_pred3 <- predict(fit3,test)
+test$C6H6.GT_pred3   <- C6H6.GT_pred3
+ggplot(test,aes(x=NMHC.GT.,y=C6H6.GT_pred3,))+
+  geom_point(col='blue')+
+  geom_point(aes(x=NMHC.GT.,y=C6H6.GT.,shape='test'), col='green')+
+  geom_smooth(aes(linetype='predict'))+
+  scale_x_continuous('NMHC.GT.')+
+  scale_y_continuous('C6H6.GT.')+
+  ggtitle(sprintf('r^2=%s',r),sprintf('p.value=%s',p))+
+   labs(shape = "",linetype="") 
+```
