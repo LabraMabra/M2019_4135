@@ -1,0 +1,232 @@
+---
+title: "Task 21"
+author: "Lisa Skalon"
+date: "4/9/2020"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, error = FALSE, message = FALSE)
+```
+
+
+```{r results="hide"}
+library('ggplot2')
+library('ggpubr')
+library('dplyr')
+library('tidyr')
+library('broom')
+library('lubridate')
+library('reshape2')
+
+```
+## Statistics in R: task1
+
+### Ancomb dataset
+
+
+1) Scatter plot facetted by set + the 95% confidence level interval for predictions from a linear model 
+
+```{r}
+# make data long
+
+df_long <- anscombe %>%
+    mutate(index = 1:nrow(anscombe)) %>%
+    gather(key, value, -index) %>%
+    separate(key, c("var", "set"), 1, convert = TRUE)  %>%
+    spread(var, value)%>%
+    select(-index)
+
+```
+
+```{r}
+# plot with lm line
+ggplot(df_long,aes(x,y,group=set))+
+  geom_point()+
+  stat_smooth(method="lm")+
+  facet_wrap(~set)
+   
+```
+
+2) Summary by set
+
+```{r}
+by(df_long[,2:3], df_long$set, summary)
+```
+
+3) Correlation betveen x and y in each set. Parametric and non-parametric tests.
+
+```{r}
+pearson <- df_long %>% 
+  group_by(set) %>% 
+  do(tidy(cor.test(.$x, .$y, method='pearson')))
+
+spearman <- df_long %>% 
+  group_by(set) %>% 
+  do(tidy(cor.test(.$x, .$y, method='spearman')))
+
+df_cor <- data.frame(pearson$estimate, pearson$p.value, spearman$estimate, spearman$p.value)
+df_cor
+```
+
+### Air quality dataset
+
+1) Clean dataset
+```{r}
+# read
+df <- read.csv("./AirQualityUCI.csv", stringsAsFactors = FALSE, sep = ';')
+
+# examine the data structure
+str(df)
+
+# convert date and time to special type
+df$date_time = dmy_hms(paste(df$Date, df$Time))
+
+# remove unuseful cols
+df <- df[,c(3:15,18) ]
+
+# chr to numeric
+char_columns <- sapply(df, is.character)
+df[ , char_columns] <- lapply(df[ , char_columns] , function(x) as.numeric(gsub(",", ".", x)))
+
+# explore summary 
+summary(df)
+
+head(df)
+
+# remove na
+df <- na.omit(df)
+
+# value -200 is suspicious
+# let values -200 be NA
+df_no200 <- df[, 1:13]
+df_no200[] <- sapply(df[, 1:13] , function(x) {x[grep("-200", x)] = NA; return((x))}) 
+str(df_no200)
+
+# replace na with median 
+df_named <- replace(df_no200, TRUE, lapply(df_no200, function(x) replace(x, is.na(x), median(x, na.rm = TRUE))))
+
+# new summary without outliers
+summary(df_named)
+
+# adding date_time column
+df_named$date_time <- df$date_time
+
+
+```
+
+2) Explore columns
+
+As we can see, probably it wasn`t a good idea to replace outliers with median, because there was to many of them. We also can see, that not all variables has normal distribution. This can bias the linear regression analysis
+
+```{r}
+df_named%>%
+  mutate(id=c(1:nrow(df_named)))%>%
+  melt(measure.vars=c(1:13))->long
+
+ggplot(long, aes(value)) + 
+  geom_histogram(bins=40) + 
+  facet_wrap(~variable, scales = "free")
+
+```
+
+
+3) Let`s discovery cross-correlations
+```{r}
+# plot correlations
+panel.points<-function(x,y)
+{
+  points(x,y,cex=.01)
+}
+
+pairs(df_named[, 1:13], upper.panel = panel.points)
+
+# correlation heatmap - more comportable way to find cross-correlations
+cor_mtx <- (cor(df_named[,1:13]))
+
+# all correlations in mtx
+cor_mtx      
+
+# heatmap
+ggplot(data = melt(cor_mtx), aes(Var2, Var1, fill = value))+
+ geom_tile(color = "black")+
+ theme(axis.text.x = element_text(angle = 90))+
+  coord_fixed()
+
+
+```
+
+4) Linear regression models. Variable C6H6.GT. against all other variables.
+
+```{r}
+fit <- lm(data = df_named[,1:13], formula =  C6H6.GT. ~. ) 
+
+# significant dependencies are marked with *** and **
+summary(fit)
+```
+
+5) Explore dependencies more carefully
+
+We split data to train and test dataset
+```{r}
+sample <- sample.int(n = nrow(df_named), size = floor(.75* nrow(df_named)))
+
+train <- df_named[sample,]
+nrow(train)
+test <- df_named[-sample,]
+nrow(test)
+
+```
+
+Check C6H6.GT. against PT08.S1.CO.
+
+```{r}
+# model
+fit_cogt <- lm(data = train[,1:13], formula =  C6H6.GT. ~ PT08.S1.CO. ) 
+cogt <- summary(fit_cogt)
+cogt
+
+# plot
+ggplot(train[,1:13], aes( PT08.S1.CO., C6H6.GT.))+
+  geom_point()+
+  geom_smooth(method='lm')
+
+# predict test values
+pred_cogt <- predict(fit_cogt, test)
+
+# plot actual and predicted values
+test_plot <- data.frame(test$PT08.S1.CO., test$C6H6.GT., pred_cogt)
+
+qplot(test.PT08.S1.CO., value, 
+      data = melt(test_plot, measure.vars=c("test.C6H6.GT.", "pred_cogt")), 
+      colour=variable) +
+  geom_smooth(method='lm', col='black')+
+  ggtitle(paste("R2:", round(cogt$adj.r.squared, 5), "  pvalue:", round(cogt$coefficients[, 4], 5) ))
+```
+
+Another model: C6H6.GT. against T
+We can see, that linear regression probably found the nonexistent dependency due to nonlinear data
+
+```{r}
+
+# model
+fit_t <- lm(data = train[,1:13], formula =  C6H6.GT. ~ T ) 
+t <- summary(fit_t)
+t
+
+ggplot(train[,1:13], aes( T, C6H6.GT.))+
+  geom_point()+
+  geom_smooth(method='lm')
+
+# predict test values based on the model
+pred_t <- predict(fit_t, test)
+
+t_plot <- data.frame(test$T, test$C6H6.GT., pred_t)
+
+# plot actual and predicted values
+qplot(test.T, value, 
+      data = melt(t_plot, measure.vars=c("test.C6H6.GT.", "pred_t")), 
+      colour=variable) +
+  geom_smooth(method='lm', col='black')+
+   ggtitle(paste("R2:", round(t$adj.r.squared, 5), "  pvalue:", round(t$coefficients[, 4], 5) ))
+```
