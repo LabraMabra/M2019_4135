@@ -9,7 +9,7 @@ data$am <- as.factor(mtcars$am)
 data$gear <- as.factor(mtcars$gear)
 data$carb <- as.factor(mtcars$carb)
 
-ui <-fluidPage (
+ui <- fluidPage (
   sidebarLayout(
     sidebarPanel(
       textInput(inputId = 'title',
@@ -69,7 +69,7 @@ ui <-fluidPage (
   )
 )
 
-server <- function(input, output){
+server <- function(input, output) {
   output$scatter <- renderPlot({
     req(input$size)
     

@@ -1,0 +1,288 @@
+---
+title: "Statistics in R: Task 0"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r packages, message=F}
+library(ggplot2)
+library(ggpubr)
+```
+
+# 1. Measures of center
+
+```{r}
+x <- c(175, 176, 182, 165, 167, 172, 175, 196, 158, 172)
+```
+
+## Mode
+```{r mode}
+mode_my <- function(sample) {
+  tab <- table(sample)
+  as.numeric(names(tab)[tab == max(tab)])
+}
+
+mode_my_x <- mode_my(x)
+mode_my_x
+```
+
+## Median
+```{r median}
+median_my <- function(sample) {
+  sorted <- sort(sample)
+  (sorted[length(sample) / 2] + sorted[length(sample) / 2 + 1]) / 2
+}
+median_my_x <- median_my(x)
+
+median_builtin_x <- median(x)
+
+median_builtin_x
+median_my_x
+```
+
+## Mean
+```{r mean}
+mean_my <- function(sample) {
+  sum(sample) / length(sample)
+}
+mean_my_x <- mean_my(x)
+
+mean_builtin_x <- mean(x)
+mean_trim_x <- mean(x, trim = 0.1)
+
+mean_builtin_x
+mean_my_x
+mean_trim_x
+```
+
+## Histogram
+```{r hist}
+hist(x, breaks=10)
+abline(v = mode_my_x, col="blue")
+abline(v = median_my_x, col="orange")
+abline(v = mean_my_x, col="red")
+```
+
+## Sample with an outlier
+```{r outlier}
+x_outl <- c(x, 2)
+
+mode_my_outl <- mode_my(x_outl)
+
+median_builtin_outl <- median(x_outl)
+median_my_outl <- median_my(x_outl)
+
+mean_builtin_outl <- mean(x_outl)
+mean_my_outl <- mean_my(x_outl)
+mean_trim_outl <- mean(x_outl, trim = 0.1)
+
+mode_my_outl
+median_builtin_outl
+median_my_outl
+mean_builtin_outl
+mean_my_outl
+mean_trim_outl
+```
+
+```{r outlier hist}
+hist(x_outl, breaks=30)
+abline(v = mode_my_outl, col="blue")
+abline(v = median_my_outl, col="orange")
+abline(v = mean_my_outl, col="red")
+```
+One of the modes and the median are overlapping.
+
+# 2. Measures of spread
+
+## Variance
+```{r var}
+var_builtin_x <- var(x)
+
+var_my <- function(sample) {
+  sum <- 0
+  for (i in 1:length(sample)) {
+    sum = sum + (sample[i] - mean_builtin_x)^2
+  }
+  sum / (length(sample) - 1)
+}
+var_my_x <- var_my(x)
+
+var_builtin_x
+var_my_x
+```
+
+## SD
+```{r sd}
+sd_builtin_x <- sd(x)
+sd_my_x <- sqrt(var_my_x)
+
+sd_builtin_x
+sd_my_x
+```
+
+## Boxplot
+```{r boxplot}
+iqr_x <- IQR(x)
+
+boxplot(x)
+abline(h = range(x), col="blue")
+abline(h = median_builtin_x + iqr_x, col="orange")
+abline(h = median_builtin_x - iqr_x, col="orange")
+abline(h = mean_builtin_x + sd_builtin_x, col="red")
+abline(h = mean_builtin_x - sd_builtin_x, col="red")
+```
+
+## Sample with an outlier
+```{r outlier boxplot}
+iqr_outl <- IQR(x_outl)
+sd_outl <- sd(x_outl)
+
+boxplot(x_outl)
+abline(h = range(x_outl), col="blue")
+abline(h = median_builtin_outl + iqr_outl, col="orange")
+abline(h = median_builtin_outl - iqr_outl, col="orange")
+abline(h = mean_builtin_outl + sd_outl, col="red")
+abline(h = mean_builtin_outl - sd_outl, col="red")
+```
+(mean_builtin_outl + sd_outl) is outside of the plot.
+
+# 3. Properties
+
+## Checking
+```{r properties}
+sub <- x - 100
+div <- x / 100
+
+all.equal(mean(sub), mean(x) - 100)
+all.equal(mean(div), mean(x) / 100)
+abs(sum(x - mean(x)) - 0) < 0.000000001
+
+all.equal(var(sub), var(x))
+all.equal(var(div), var(x) / 10000)
+all.equal(sd(div), sd(x) / 100)
+```
+
+## Visualization
+### Table
+```{r properties table}
+prop_df <- matrix(c(mean(x), mean(sub), mean(div), 
+                       var(x), var(sub), var(div), 
+                       sd(x), sd(sub), sd(div)), ncol=3,byrow=TRUE)
+colnames(prop_df) <- c('x','x-100','x/100')
+rownames(prop_df) <- c("mean","var","sd")
+prop_df <- as.data.frame(prop_df)
+prop_df
+```
+
+### Plot
+```{r proccessing before plotting}
+data_df <- cbind(x, sub, div)
+samples_ids <- c('x','x-100','x/100')
+colnames(data_df) <- samples_ids
+prop_df <- rbind(prop_df, data_df)
+```
+
+```{r properties plot}
+plot <- function(sample_id) {
+  info <- prop_df[[sample_id]]
+  ggplot() +
+    aes(info[4:13]) +
+    geom_density() +
+    geom_vline(aes(xintercept=info[[1]], color="mean")) +
+    geom_vline(aes(xintercept=info[[2]], color="var")) +
+    geom_vline(aes(xintercept=info[[3]], color="sd")) +
+    xlab(sample_id)
+}
+
+# not working with cycle; with cycle through samples_ids instead of apply 
+# it will use the last sample_id in all plots, so all plots will be the same
+plots <- lapply(samples_ids, plot)
+ggarrange(plotlist=plots, ncol=1, common.legend = TRUE)
+```
+
+
+# 4. Normal distribution
+
+```{r seed}
+set.seed(42)
+```
+
+```{r pnorm}
+# p(x < 156)
+pnorm(156, mean=175, sd=10)
+# p(x > 198)
+pnorm(198, mean=175, sd=10, lower=FALSE)
+
+# p(168 < x < 172)
+obs <- 1e5
+sample <- rnorm(obs, mean=175, sd=10)
+sum(sample > 168 & sample < 172) / obs
+```
+
+## Standard normal distribution
+```{r sds}
+# mean = 0, sd = 1
+sample <- rnorm(obs)
+# +/- 1 sd: 68%
+sum(sample > -1 & sample < 1) / obs
+# +/- 2 sd: 95%
+sum(sample > -2 & sample < 2) / obs
+# +/- 3 sd: 99.7%
+sum(sample > -3 & sample < 3) / obs
+```
+
+## Standardization
+```{r scale}
+sample <- rnorm(obs, mean=175, sd=10)
+mean(sample)
+sd(sample)
+
+sample <- scale(sample, center=TRUE, scale=TRUE)
+mean(sample)
+sd(sample)
+```
+
+
+# 5. Central Limit Theorem
+```{r clt}
+stat_by_k <- function(population, k) {
+  samples <- replicate(n, sample(population, k))
+  means <- colMeans(samples)
+  c(k, mean(means), sd(means), sd(means)/sqrt(n), means)
+}
+
+obs <- 1e6
+population <- rnorm(obs)
+ks <- c(10, 50, 100, 500)
+n <- 30
+stat <- data.frame()
+distr <- vector(mode="list", length=length(ks))
+names(distr) <- ks
+for (k in ks) {
+  stat_temp <- stat_by_k(population, k)
+  stat <- rbind(stat, stat_temp[1:4])
+  distr[[as.character(k)]] <- stat_temp[5:n+4]
+}
+colnames(stat) <- c('k','mean','sd', 'SE')
+
+stat
+```
+
+```{r clt hist, message=F, warning=F}
+plot <- function(k) {
+  ggplot() +
+    aes(distr[[as.character(k)]]) +
+    geom_histogram() +
+    geom_vline(aes(xintercept=stat[stat$k == k, 2], color="mean")) +
+    geom_vline(aes(xintercept=stat[stat$k == k, 4], color="SE")) +
+    xlab(paste(k, " observations")) +
+    xlim(-0.5, 0.5)
+}
+
+plots <- lapply(ks, plot)
+ggarrange(plotlist=plots, common.legend = TRUE)
+```
+
