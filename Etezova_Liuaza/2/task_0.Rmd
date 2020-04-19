@@ -1,9 +1,10 @@
 ---
 title: "Statistics in R: Task 0"
+author: "Liuaza Etezova"
 output: pdf_document
 ---
 
-```{r setup, include=FALSE}
+```{r setup, include=F}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
@@ -187,13 +188,13 @@ prop_df <- rbind(prop_df, data_df)
 
 ```{r properties plot}
 plot <- function(sample_id) {
-  info <- prop_df[[sample_id]]
+  column <- prop_df[[sample_id]]
   ggplot() +
-    aes(info[4:13]) +
+    aes(column[4:13]) +
     geom_density() +
-    geom_vline(aes(xintercept=info[[1]], color="mean")) +
-    geom_vline(aes(xintercept=info[[2]], color="var")) +
-    geom_vline(aes(xintercept=info[[3]], color="sd")) +
+    geom_vline(aes(xintercept=column[[1]], color="mean")) +
+    geom_vline(aes(xintercept=column[[2]], color="var")) +
+    geom_vline(aes(xintercept=column[[3]], color="sd")) +
     xlab(sample_id)
 }
 
