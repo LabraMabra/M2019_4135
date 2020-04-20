@@ -1,0 +1,349 @@
+---
+title: "HW_2_1"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE}
+library(data.table)
+library(dplyr)
+library(ggplot2)
+library(ggpubr)
+library(tidyr)
+library(reshape2)
+library(plyr)
+```
+
+Task1.
+Q1. Scatter plot facetted by set
+```{r message=FALSE, warning=FALSE}
+anscombe <- as.data.frame(anscombe)
+head(anscombe)
+nrow(anscombe)
+#generate levels to indicate which group each data point belong to 
+levels <- gl(4, nrow(anscombe))
+levels
+#Group it in dataframe
+anscombe_grouped <- with(anscombe, data.frame(x=c(x1,x2,x3,x4),y=c(y1,y2,y3,y4), set=levels))
+anscombe_grouped
+#Make scattterplots
+ggplot(anscombe_grouped, aes(x,y))+
+  geom_point(size=3) +
+  facet_wrap(~set)
+```
+Q2. Summary calculation(mean, sd) grouped by set
+```{r message=FALSE, warning=FALSE}
+#Mean
+aggregate(cbind(x, y) ~ set, anscombe_grouped, mean)
+#SD
+aggregate(cbind(x, y) ~ set, anscombe_grouped, sd)
+```
+Q3. Pearson's correlation by set and non-parametric, and p-value
+```{r message=FALSE, warning=FALSE}
+
+
+anscombe_grouped%>% group_by(set) %>% summarise(cor_pearson = cor.test(x,y, method = 'pearson')$estimate, 
+                                      cor_kendall = cor.test(x,y, method = 'kendall')$estimate,
+                                      cor_spearmen = cor.test(x,y, method = 'spearman')$estimate)
+
+anscombe_grouped %>% group_by(set) %>% summarise(p_pearson = cor.test(x,y, method = 'pearson')$p.value,
+                                     p_kendall = cor.test(x,y, method = 'kendall')$p.value,
+                                     p_spearmen = cor.test(x,y, method = 'spearman')$p.value)
+```
+Q4. Add geom smooth() to the plot
+```{r message=FALSE, warning=FALSE}
+ggplot( anscombe_grouped, aes(x, y)) +
+  geom_point() + 
+  geom_smooth(method = lm, se = F) +
+  facet_wrap(~ set) 
+
+```
+Task2.
+Q1. Explore data set, clean if needed
+```{r message=FALSE, warning=FALSE}
+aq <- read.csv2("/Users/Lisa/Downloads/AirQualityUCI/AirQualityUCI.csv", header =T)
+str(aq)
+#We see some NA. Let's remove them
+colSums(is.na(aq))
+aq_cleaned <-  aq  %>% select_if(~sum(!is.na(.)) > 0)  %>% drop_na()
+head(aq_cleaned)
+#Delete strange variables that contain value 200
+airq_fil <- aq_cleaned %>% filter_all(all_vars(. != -200))
+#Convert to long dataset
+air_long <- melt(airq_fil)
+head(air_long)
+
+```
+Q2.Explore each variable independently 
+```{r message=FALSE, warning=FALSE}
+
+  ggplot(air_long, aes(value)) +
+  geom_boxplot() +
+  facet_wrap(~variable, scales="free")
+
+ ggplot(air_long, aes(value)) +
+  geom_histogram() +
+  facet_wrap(~variable, scales="free")
+
+```
+Q3.Cross correlation
+```{r message=FALSE, warning=FALSE}
+correl <- as.matrix(airq_fil[,c(3:15)])
+cor(correl, use="complete.obs", method="spearman")
+heatmap(cor(correl, use="complete.obs", method="spearman"))
+```
+Q4. Response C6H6(GT)
+```{r message=FALSE, warning=FALSE}
+airq_fil %>%
+  lm(data = ., airq_fil$C6H6.GT. ~ airq_fil$CO.GT.) %>%
+  summary()
+```
+Q5. Build simple linear models with each predictor, check assumptions, response C6H6
+```{r}
+airq_fil %>%
+  ggplot(aes(x= CO.GT., y= C6H6.GT.)) +
+  geom_point() +
+  geom_smooth(method="lm")
+```
+```{r}
+airq_fil  %>%
+  lm(data= .,C6H6.GT. ~ C6H6.GT.)%>%
+  summary()
+```
+
+```{r}
+#PT08.S1.CO
+airq_fil %>%
+  ggplot(aes(x= PT08.S1.CO., y= C6H6.GT.)) +
+  geom_point() +
+  geom_smooth(method="lm")
+```
+
+```{r}
+airq_fil  %>%
+  lm(data= .,C6H6.GT. ~ PT08.S1.CO.)%>%
+  summary()
+```
+```{r}
+#PT08.S2.NMHC
+airq_fil %>%
+  ggplot(aes(x= PT08.S2.NMHC., y= C6H6.GT.)) +
+  geom_point() +
+  geom_smooth(method="lm")
+```
+
+```{r}
+airq_fil  %>%
+  lm(data= .,C6H6.GT. ~ PT08.S2.NMHC.)%>%
+  summary()
+
+```
+
+```{r}
+#PT08.S3.NOx
+airq_fil %>%
+  ggplot(aes(x= PT08.S3.NOx., y= C6H6.GT.)) +
+  geom_point() +
+  geom_smooth(method="lm")
+```
+
+```{r}
+airq_fil  %>%
+  lm(data= .,C6H6.GT. ~ PT08.S3.NOx.)%>%
+  summary()
+```
+
+```{r}
+#PT08.S4.NO2
+airq_fil %>%
+  ggplot(aes(x= PT08.S4.NO2., y= C6H6.GT.)) +
+  geom_point() +
+  geom_smooth(method="lm")
+```
+
+```{r}
+airq_fil  %>%
+  lm(data= .,C6H6.GT. ~ PT08.S4.NO2.)%>%
+  summary()
+```
+
+```{r}
+#PT08.S5.O3
+airq_fil %>%
+  ggplot(aes(x= PT08.S5.O3., y= C6H6.GT.)) +
+  geom_point() +
+  geom_smooth(method="lm")
+```
+
+```{r}
+airq_fil  %>%
+  lm(data= .,C6H6.GT. ~ PT08.S5.O3.)%>%
+  summary()
+```
+
+```{r}
+# NMHC.GT
+airq_fil %>%
+  ggplot(aes(x= NMHC.GT., y= C6H6.GT.)) +
+  geom_point() +
+  geom_smooth(method="lm")
+```
+
+```{r}
+airq_fil  %>%
+  lm(data= .,C6H6.GT. ~ NMHC.GT.)%>%
+  summary()
+```
+
+```{r}
+#NOx.GT
+airq_fil %>%
+  ggplot(aes(x= NOx.GT., y= C6H6.GT.)) +
+  geom_point() +
+  geom_smooth(method="lm")
+```
+
+```{r}
+airq_fil  %>%
+  lm(data= .,C6H6.GT. ~ NOx.GT.)%>%
+  summary()
+```
+
+
+```{r}
+#NO2.GT
+airq_fil %>%
+  ggplot(aes(x= NO2.GT., y= C6H6.GT.)) +
+  geom_point() +
+  geom_smooth(method="lm")
+```
+
+```{r}
+airq_fil  %>%
+  lm(data= .,C6H6.GT. ~ NO2.GT.)%>%
+  summary()
+```
+
+```{r}
+#T
+airq_fil %>%
+  ggplot(aes(x= T, y= C6H6.GT.)) +
+  geom_point() +
+  geom_smooth(method="lm")
+```
+
+```{r}
+airq_fil  %>%
+  lm(data= .,C6H6.GT. ~ T)%>%
+  summary()
+```
+
+```{r}
+#RH
+airq_fil %>%
+  ggplot(aes(x= RH, y= C6H6.GT.)) +
+  geom_point() +
+  geom_smooth(method="lm")
+```
+
+```{r}
+airq_fil  %>%
+  lm(data= .,C6H6.GT. ~ RH)%>%
+  summary()
+
+```
+```{r}
+airq_fil %>%
+  ggplot(aes(x= AH, y= C6H6.GT.)) +
+  geom_point() +
+  geom_smooth(method="lm")
+```
+
+```{r}
+airq_fil  %>%
+  lm(data= .,C6H6.GT. ~ AH)%>%
+  summary()
+```
+Q6. For 2-3 of the models create train-test sets, plot the model for the test set color real and predicted points differently; R^2 and p-value to title 
+
+```{r}
+#PT08.S5.O3
+set.seed(42)
+#Separated data in 75:25%
+sample <- sample.int(n = nrow(airq_fil), size = floor(.75*nrow(airq_fil)))
+training <- airq_fil[sample, ]
+test <- airq_fil[-sample, ]
+train_PT <- training[,c("C6H6.GT.", "PT08.S5.O3." )] 
+test_PT <- test[,c("C6H6.GT.", "PT08.S5.O3." )]
+model_PT <- lm(data = train_PT , C6H6.GT. ~ PT08.S5.O3.)
+#summary
+summary <- summary(model_PT)
+print(summary)
+#Predicition
+pred_PT <- predict(model_PT, newdata = test_PT) 
+test$PT08.S5.O3._pred <- pred_PT
+#make combined dataset
+train_PT$airq_fil <- "train"
+test_PT$airq_fil <- "test" 
+test_PT[1:(nrow(test_PT)/2),3] <- "real"
+
+all_PT <- rbind(train_PT, test_PT)
+```
+
+```{r}
+ggplot(data = all_PT, aes(x = PT08.S5.O3.,
+y = C6H6.GT., 
+color=airq_fil)) +
+  geom_point() +
+geom_smooth(method = "lm", color = "black") +
+ggtitle(paste("R2", round(summary$r.squared, 3), sep = ": "),
+paste("pvalue <2e-16" ))
+```
+
+
+```{r}
+# NMHC.GT
+set.seed(42)
+#Separated data in 75:25%
+sample <- sample.int(n = nrow(airq_fil), size = floor(.75*nrow(airq_fil)))
+training <- airq_fil[sample, ]
+test <- airq_fil[-sample, ]
+train_MH <- training[,c("C6H6.GT.", "NMHC.GT." )] 
+test_MH <- test[,c("C6H6.GT.", "NMHC.GT." )]
+model_MH <- lm(data = train_MH , C6H6.GT. ~ NMHC.GT.)
+#summary
+summary <- summary(model_MH)
+print(summary)
+
+#Predicition
+pred_MH <- predict(model_MH, newdata = test_MH) 
+test$NMHC.GT._pred <- pred_MH
+#make combined dataset
+train_MH$airq_fil <- "train"
+test_MH$airq_fil <- "test" 
+test_MH[1:(nrow(test_MH)/2),3] <- "real"
+
+all_PT <- rbind(train_MH, test_MH)
+#trained and test should be similar shape
+```
+
+```{r}
+ggplot(data = all_PT, aes(x = NMHC.GT.,
+y = C6H6.GT., 
+color=airq_fil)) +
+  geom_point() +
+geom_smooth(method = "lm", color = "black") +
+ggtitle(paste("R2", round(summary$r.squared, 3), sep = ": "),
+paste("pvalue <2e-16" ))
+
+```
+
+
+
+
+
