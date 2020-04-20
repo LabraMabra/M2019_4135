@@ -113,7 +113,10 @@ ggplot(airq_for_hist, aes(value)) +
     facet_wrap(~name, scales='free_y') +
     xlim(-300, 0)
 ```
--200 like the default value for this data. I will not delete all rows with this value because this way I will loose too much data (8,530 rows out of 9,357), but I will replace all individual values with NAs to pairwise exclude them in correlation analysis ("use='pairwise.complete.obs'" argument in "corr" function).
+-200 like the default value for this data. I will not delete all rows with this value because 
+this way I will loose too much data (8,530 rows out of 9,357), but I will replace all individual 
+values with NAs to pairwise exclude them in correlation analysis ("use='pairwise.complete.obs'" 
+argument in "corr" function).
 
 ## Cleaning
 ```{r na}
@@ -184,14 +187,14 @@ benzene_lm_summary <- function(predictor) {
     summary()
 }
 
-lapply(airq_l[, !(names(airq_l) %in% c('Date', 'Time', 'C6H6.GT.'))], benzene_lm_summary)
+lapply(airq_l[, !(names(airq_l) %in% c('Date', 'Time', 'C6H6.GT.', 'T', 'RH', 'AH'))], 
+       benzene_lm_summary)
 ```
 
 ### Selected predictors
-PT08.S2(NMHC): PT08.S2(NMHC)^2 after linearizing - titanium dioxide,
-CO(GT) - carbon monoxide, 
-NMHC(GT): NMHC(GT)^0.7 after linearizing - nonmethane hydrocarbons.
-They have Adjusted R-squared > 0.84. R-squared for PT08.S2(NMHC)^2 is 0.9996.
+PT08.S2(NMHC) {PT08.S2(NMHC)^2 after linearizing} - titanium dioxide (R^2 = 0.9996),
+CO(GT) - carbon monoxide (R^2 = 0.8669), 
+NMHC(GT) {NMHC(GT)^0.7 after linearizing} - nonmethane hydrocarbons (R^2 = 0.8488).
 ```{r}
 set.seed(42)
 sample <- sample.int(n=nrow(airq_l), size=floor(.75*nrow(airq_l)))
@@ -211,34 +214,33 @@ test$C6H6byNMHC <- predict(model_NMHC, newdata=test)
 ```
 
 ### Plots
-```{r plots, warning=F}
-predictor <- 'PT08.S2.NMHC.'
-ggplot() +
-  ggtitle(paste("R-squared = ", summary_PT08S2$adj.r.squared, '\n', "p-value = ", 
-                summary_PT08S2$coefficients[,4][[2]])) +
-  xlab('PT08.S2(NMHC)^2') + 
-  geom_point(data=train, aes_string(x=predictor, y='C6H6.GT.')) +
-  geom_point(data=test, aes_string(x=predictor, y='C6H6.GT.'), color='green') + 
-  geom_smooth(method='lm', se=F, data=train, aes_string(x=predictor, y='C6H6.GT.')) + 
-  geom_point(data=test, aes_string(x=predictor, y='C6H6byPT08S2'), color='red')
+```{r, warning=F}
+plot <- function(lm_info) {
+    ggplot() +
+    geom_point(data=train, aes_string(x=lm_info[[1]], y='C6H6.GT.', 
+                                      color=shQuote('train'), shape=shQuote('train'))) +
+    geom_point(data=test, aes_string(x=lm_info[[1]], y='C6H6.GT.', 
+                                     color=shQuote('test'), shape=shQuote('test'))) + 
+    geom_smooth(method='lm', se=F, data=train, aes_string(x=lm_info[[1]], y='C6H6.GT.'), 
+                color='black') + 
+    geom_point(data=test, aes_string(x=lm_info[[1]], y=lm_info[[2]], 
+                                     color=shQuote('predicted'), shape=shQuote('predicted'))) + 
+    scale_colour_manual(name="data", breaks=c('train', 'test', 'predicted'), 
+                        values=c(train="blue", test="red", predicted="green3")) + 
+    scale_shape_manual(name="data", breaks=c('train', 'test', 'predicted'), 
+                       values=c(train=1, test=2, predicted=20)) + 
+    xlab(lm_info[[3]]) + 
+    ggtitle(paste("R-squared = ", lm_info[[4]], '\n', "p-value = ", lm_info[[5]]))
+}
 
-predictor <- 'CO.GT.'
-ggplot() +
-  ggtitle(paste("R-squared = ", summary_CO$adj.r.squared, '\n', "p-value = ", 
-                summary_CO$coefficients[,4][[2]])) +
-  xlab('CO(GT)') + 
-  geom_point(data=train, aes_string(x=predictor, y='C6H6.GT.')) +
-  geom_point(data=test, aes_string(x=predictor, y='C6H6.GT.'), color='green') + 
-  geom_smooth(method='lm', se=F, data=train, aes_string(x=predictor, y='C6H6.GT.')) + 
-  geom_point(data=test, aes_string(x=predictor, y='C6H6byCO'), color='red')
+# list(predictor, predicted, xlab, R^2, p-value)
+PT08S2 <- list('PT08.S2.NMHC.', 'C6H6byPT08S2', 'PT08.S2(NMHC)^2',
+               summary_PT08S2$adj.r.squared, summary_PT08S2$coefficients[,4][[2]])
+CO     <- list('CO.GT.', 'C6H6byCO', 'CO(GT)', 
+               summary_CO$adj.r.squared, summary_CO$coefficients[,4][[2]])
+NMHC   <- list('NMHC.GT.', 'C6H6byNMHC', 'NMHC(GT)^0.7', 
+               summary_NMHC$adj.r.squared, summary_NMHC$coefficients[,4][[2]])
 
-predictor <- 'NMHC.GT.'
-ggplot() +
-  ggtitle(paste("R-squared = ", summary_NMHC$adj.r.squared, '\n', "p-value = ", 
-                summary_NMHC$coefficients[,4][[2]])) +
-  xlab('NMHC(GT)^0.7') + 
-  geom_point(data=train, aes_string(x=predictor, y='C6H6.GT.')) +
-  geom_point(data=test, aes_string(x=predictor, y='C6H6.GT.'), color='green') + 
-  geom_smooth(method='lm', se=F, data=train, aes_string(x=predictor, y='C6H6.GT.')) + 
-  geom_point(data=test, aes_string(x=predictor, y='C6H6byNMHC'), color='red')
+info <- list(PT08S2 = PT08S2, CO = CO, NMHC = NMHC)
+lapply(info, plot)
 ```
