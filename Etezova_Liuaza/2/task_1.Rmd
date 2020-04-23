@@ -171,12 +171,12 @@ ggarrange(plotlist=plots, ncol=2)
 
 ```{r linearizing}
 airq_l <- air_quality
-airq_l$NMHC.GT. <- air_quality$NMHC.GT.^(0.7)
-airq_l$PT08.S1.CO. <- air_quality$PT08.S1.CO.^2
-airq_l$PT08.S2.NMHC. <- air_quality$PT08.S2.NMHC.^2
-airq_l$PT08.S3.NOx. <- 1/air_quality$PT08.S3.NOx.^2
-airq_l$PT08.S4.NO2. <- air_quality$PT08.S4.NO2.^(2.5)
-airq_l$PT08.S5.O3. <- air_quality$PT08.S5.O3.^(1.5)
+airq_l$`NMHC.GT.^0.7` <- air_quality$NMHC.GT.^(0.7)
+airq_l$`PT08.S1.CO.^2` <- air_quality$PT08.S1.CO.^2
+airq_l$`PT08.S2.NMHC.^2` <- air_quality$PT08.S2.NMHC.^2
+airq_l$`PT08.S3.NOx.^2` <- 1/air_quality$PT08.S3.NOx.^2
+airq_l$`PT08.S4.NO2.^2.5` <- air_quality$PT08.S4.NO2.^(2.5)
+airq_l$`PT08.S5.O3.^1.5` <- air_quality$PT08.S5.O3.^(1.5)
 ```
 
 ### Building linear models
@@ -187,26 +187,26 @@ benzene_lm_summary <- function(predictor) {
     summary()
 }
 
-lapply(airq_l[, !(names(airq_l) %in% c('Date', 'Time', 'C6H6.GT.', 'T', 'RH', 'AH'))], 
+lapply(airq_l[, !(names(airq_l) %in% c('Date', 'Time', 'C6H6.GT.', 
+                                       'T', 'RH', 'AH', 
+                                       'NMHC.GT.', 'PT08.S1.CO.', 'PT08.S2.NMHC.', 
+                                       'PT08.S3.NOx.', 'PT08.S4.NO2.', 'PT08.S5.O3.'))], 
        benzene_lm_summary)
 ```
 
 ### Selected predictors
-PT08.S2(NMHC) {PT08.S2(NMHC)^2 after linearizing} - titanium dioxide (R^2 = 0.9996),
+PT08.S2(NMHC)^2 - titanium dioxide (R^2 = 0.9996),
 CO(GT) - carbon monoxide (R^2 = 0.8669), 
-NMHC(GT) {NMHC(GT)^0.7 after linearizing} - nonmethane hydrocarbons (R^2 = 0.8488).
+NMHC(GT)^0.7 - nonmethane hydrocarbons (R^2 = 0.8486).
 ```{r}
 set.seed(42)
 sample <- sample.int(n=nrow(airq_l), size=floor(.75*nrow(airq_l)))
 train <- airq_l[sample, ]
 test <- airq_l[-sample, ]
 
-model_PT08S2 <- lm(data=train, C6H6.GT. ~ PT08.S2.NMHC.)
+model_PT08S2 <- lm(data=train, C6H6.GT. ~ `PT08.S2.NMHC.^2`)
 model_CO <- lm(data=train, C6H6.GT. ~ CO.GT.)
-model_NMHC <- lm(data=train, C6H6.GT. ~ NMHC.GT.)
-summary_PT08S2 <- summary(model_PT08S2)
-summary_CO <- summary(model_CO)
-summary_NMHC <- summary(model_NMHC)
+model_NMHC <- lm(data=train, C6H6.GT. ~ `NMHC.GT.^0.7`)
 
 test$C6H6byPT08S2 <- predict(model_PT08S2, newdata=test)
 test$C6H6byCO <- predict(model_CO, newdata=test)
@@ -224,22 +224,20 @@ plot <- function(lm_info) {
     geom_smooth(method='lm', se=F, data=train, aes_string(x=lm_info[[1]], y='C6H6.GT.'), 
                 color='black') + 
     geom_point(data=test, aes_string(x=lm_info[[1]], y=lm_info[[2]], 
-                                     color=shQuote('predicted'), shape=shQuote('predicted'))) + 
+                                     color=shQuote('predicted'), 
+                                     shape=shQuote('predicted'))) + 
     scale_colour_manual(name="data", breaks=c('train', 'test', 'predicted'), 
                         values=c(train="blue", test="red", predicted="green3")) + 
     scale_shape_manual(name="data", breaks=c('train', 'test', 'predicted'), 
                        values=c(train=1, test=2, predicted=20)) + 
-    xlab(lm_info[[3]]) + 
-    ggtitle(paste("R-squared = ", lm_info[[4]], '\n', "p-value = ", lm_info[[5]]))
+    ggtitle(paste("R-squared = ", lm_info[[3]]$adj.r.squared, '\n', 
+                  "p-value = ", lm_info[[3]]$coefficients[,4][[2]]))
 }
 
-# list(predictor, predicted, xlab, R^2, p-value)
-PT08S2 <- list('PT08.S2.NMHC.', 'C6H6byPT08S2', 'PT08.S2(NMHC)^2',
-               summary_PT08S2$adj.r.squared, summary_PT08S2$coefficients[,4][[2]])
-CO     <- list('CO.GT.', 'C6H6byCO', 'CO(GT)', 
-               summary_CO$adj.r.squared, summary_CO$coefficients[,4][[2]])
-NMHC   <- list('NMHC.GT.', 'C6H6byNMHC', 'NMHC(GT)^0.7', 
-               summary_NMHC$adj.r.squared, summary_NMHC$coefficients[,4][[2]])
+# list(predictor, predicted, linear model summary)
+PT08S2 <- list('PT08.S2.NMHC.^2', 'C6H6byPT08S2', summary(model_PT08S2))
+CO     <- list('CO.GT.', 'C6H6byCO', summary(model_CO))
+NMHC   <- list('NMHC.GT.^0.7', 'C6H6byNMHC', summary(model_NMHC))
 
 info <- list(PT08S2 = PT08S2, CO = CO, NMHC = NMHC)
 lapply(info, plot)
