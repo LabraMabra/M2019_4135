@@ -1,0 +1,304 @@
+---
+title: "HW2.2_Mary_Futey"
+author: "Mary Futey"
+date: "4/26/2020"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r Libraries, include=FALSE}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(magrittr)
+library(plyr)
+library(reshape2)
+library(corrplot)
+library(data.table)
+library(car)
+
+```
+
+## Air Quality dataset
+
+* Convert date and time to factor, check for NAs, switch comma to decimal
+
+```{r Air Q load}
+airq <- read.csv("/Users/maryfutey/desktop/AirQualityUCI/AirQualityUCI.csv", 
+                 header = TRUE,
+                 dec=",")
+#deleted column  NMHC.GT. as there were many "-200" values
+airq <- airq[, -5]
+
+summary(airq)
+
+airq_long <- gather(airq, key="measurement", value="value", -c(Date,Time))
+
+airq_long$Date <- as.factor(airq_long$Date)
+airq_long$Time <- as.factor(airq_long$Time)
+airq_long$measurement <- as.factor(airq_long$measurement)
+
+```
+
+* Clean and remove "-200" values as they are not possible / erroneous 
+
+```{r Air Q  clean}
+airq_fil <- airq_long %>% 
+  filter(value != -200)
+
+summary(airq_fil)
+colSums(is.na(airq_fil))
+
+```
+
+* Need to normalize data
+
+```{r Air Q norm}
+airq_wide <- spread(airq_fil, key = "measurement" ,value = "value")
+airq_wide <- na.omit(airq_wide)
+
+norm <- function(x) {
+    (x - min(x)) / (max(x) - min(x))
+  }
+
+airq_norm <- as.data.frame(lapply(airq_wide[3:14], norm))
+airq_norm$Date <- airq_wide$Date
+airq_norm$Time <- airq_wide$Time
+
+airq_norm_long <- gather(airq_norm, key = "measurement", value = "value", -c(Date, Time))
+
+```
+
+#Explore multicollinearity 
+
+*Choose good predictors 
+
+*Check residuals 
+
+*Do you need some non-linear transformations for some of predictors? Or maybe response? 
++log(x)
++sqrt(x)
++(x)^2
+
+** selected two predictor with high R^2, but non-linear tp transform: PT08.S2.NMHC.
+
+
+```{r Air non-linear transformation PT08.S2.NMHC.}
+
+# PT08.S2.NMHC.: residuals look better after quadratic transformtion, 
+#however residuals vs fitted plot cubic
+# R^2 of 0.999, how so high?
+lm_3 <- lm(C6H6.GT. ~ PT08.S2.NMHC., airq_norm)
+residuals(lm_3) %>% hist(main = "residuals PT08.S2.NMHC.")
+summary(lm_3)
+plot(lm_3, which = 1)
+
+airq_norm$NMHC_sq <- (airq_norm$PT08.S2.NMHC.)^2
+
+lm_4 <- lm(C6H6.GT. ~ PT08.S2.NMHC. + NMHC_sq, airq_norm)
+residuals(lm_4) %>% hist(main = "residuals PT08.S2.NMHC.^2")
+summary(lm_4)
+plot(lm_4, which = 1)
+
+airq_norm$NMHC_rt <- sqrt(airq_norm$PT08.S2.NMHC.)
+
+lm_2 <- lm(C6H6.GT. ~ PT08.S2.NMHC. + NMHC_rt, airq_norm)
+residuals(lm_2) %>% hist(main = "residuals PT08.S2.NMHC. sqrt transformed")
+summary(lm_2)
+plot(lm_2, which = 1)
+
+
+```
+
+## Make a coorelation matrix to select predictors to use in multiple linear regression
+* due to deletion of NHMC column, matrix is differnet from the previous homework 
+
+```{r coorelation matrix}
+
+airq_sub <- airq_norm[, 1:12]
+colnames(airq_sub) <- c(
+  "Abs H",
+  "C6H6",
+  "CO",
+  "NO2",
+  "NOx",
+  "S1.CO",
+  "S2.NMHC",
+  "S3.NOx",
+  "S4.NO2",
+  "S5.O3",
+  "Rel H", 
+  "Temp"
+)
+
+airq_cor <- round(cor(airq_sub, method = "kendall"),2)
+
+#reorder, create upper triangle
+reorder_airq_cor <- function(airq_cor){
+  # Use correlation between variables as distance
+  dd <- as.dist((1-airq_cor)/2)
+  hc <- hclust(dd)
+  airq_cor <-airq_cor[hc$order, hc$order]
+}
+
+get_upper_tri <- function(airq_cor){
+  airq_cor[lower.tri(airq_cor)]<- NA
+  return(airq_cor)
+}
+
+airq_cor <- reorder_airq_cor(airq_cor)
+upper_tri <- get_upper_tri(airq_cor)
+melt_uppertri <- melt(upper_tri, na.rm = TRUE)
+
+p1 <- ggplot(melt_uppertri, 
+             aes(Var2, Var1, 
+                 fill = value)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
+                       midpoint = 0, limit = c(-1,1), space = "Lab", 
+                       name="Kendall\nCorrelation") +
+  ggtitle("Correlation Matrix for Air Quality Dataset") +
+  theme_minimal() + 
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, 
+                                   size = 7, hjust = 1)) +
+  coord_fixed() +
+  geom_text(aes(Var2, 
+                Var1, 
+                label = value), 
+            color = "black", size = 2.6) +
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.border = element_blank(),
+    panel.background = element_blank(),
+    axis.ticks = element_blank(),
+    legend.justification = c(1, 0),
+    legend.position = c(0.6, 0.7),
+    legend.direction = "horizontal")+
+  guides(fill = guide_colorbar(barwidth = 7, barheight = 1,
+                               title.position = "top", title.hjust = 0.5))
+
+p1
+```
+
+```{r Air CO predictor }
+
+#single linear regression with good predictor for baseline comparison 
+
+lm_5 <- lm(C6H6.GT. ~ CO.GT., airq_norm)
+summary(lm_5)
+residuals(lm_5) %>% hist(main = "residuals ave CO")
+
+ggplot(lm_5, 
+       aes(x = CO.GT., y = C6H6.GT.)) +
+  geom_point() +
+  geom_line(aes(y = .fitted), color = "red", size = 1) +
+  ggtitle("predictor ave CO")
+
+```
+
+## selected the following predictors: CO.GT., PT08.S1.CO. and PT08.S2.NMHC. for building a model
+
+```{r Air multiple regression 3 predictors}
+
+#CO: corr 0.88, good residuals, high R^2, sigif, linear
+#PT08.S1.CO., corr 0.83, residuals okay, high R^2, sigif, linear
+#PT08.S2.NMHC., sym residuals, high R^2, sigif, linear 
+
+#very high R^2, but residuals vs fitted plot not linear
+
+lm_6 <- lm(C6H6.GT. ~ CO.GT. + PT08.S1.CO. + PT08.S2.NMHC., airq_norm)
+summary(lm_6)
+residuals(lm_6) %>% hist(main = "residuals multi regression 3 predictors and S2.NMHC transformed")
+
+plot(lm_6, which = 1)
+
+
+```
+
+
+```{r Air multiple regression 3 predictors and transformed}
+
+#CO: corr 0.88, good residuals, high R^2, sigif, linear
+#PT08.S1.CO., corr 0.83, residuals okay, high R^2, sigif, linear
+#PT08.S2.NMHC., sym residuals, high R^2, sigif, linear 
+
+#inclusion of transformed PT08.S2.NMHC appears to make residuals vs fitted plot cubic?
+
+lm_6 <- lm(C6H6.GT. ~ CO.GT. + PT08.S1.CO. + PT08.S2.NMHC. + NMHC_sq, airq_norm)
+summary(lm_6)
+residuals(lm_6) %>% hist(main = "residuals multi regression 3 predictors and S2.NMHC transformed")
+
+plot(lm_6, which = 1)
+
+
+```
+
+## Model with the following predictors: PT08.S1.CO. and PT08.S2.NMHC.
+
+```{r Air multiple regression 2 predictors PT08.S1.CO. and PT08.S2.NMHC.}
+
+# residuals vs fitted plot is not linear
+lm_7 <- lm(C6H6.GT. ~ PT08.S1.CO. + PT08.S2.NMHC., airq_norm)
+summary(lm_7)
+residuals(lm_7) %>% hist(main = "residuals multi PT08.S1.CO. + PT08.S2.NMHC. predictors")
+
+plot(lm_7, which = 1)
+
+# variance inflation factor: 
+#how much the variance of a coefficient is inflated due to multicollinearity 
+#vif <5, which is good, however based on the plots and residuals, 
+# am not selecting this model as the "final" model
+vif(lm_7)
+
+
+```
+
+
+
+## Model with CO.GT.and PT08.S2.NMHC. 
+ 
+```{r Air multiple regression 2 predictors CO.GT. and PT08.S2.NMHC.}
+
+# seems to be quadratic, also built a model with PT08.S2.NMHC.^2, however did not improve the model
+
+lm_8 <- lm(C6H6.GT. ~ CO.GT. + PT08.S2.NMHC., airq_norm)
+summary(lm_8)
+residuals(lm_8) %>% hist(main = "residuals multi regression CO.GT. + PT08.S2.NMHC. predictors")
+
+plot(lm_8, which = 1)
+
+# vif >5: indicates multicollinearity
+vif(lm_8)
+```
+
+## Final model with the following predictors: CO.GT.and PT08.S1.CO.
+
+```{r Air multiple regression 2 predictors CO.GT. and PT08.S1.CO.}
+
+# predictors significant, best residuals with a few outliers on plot, 
+# high R^2 (larger than single regression with CO) and low vif
+
+lm_9 <- lm(C6H6.GT. ~ CO.GT. + PT08.S1.CO., airq_norm)
+summary(lm_9)
+residuals(lm_9) %>% hist(main = "residuals multi regression CO.GT. + PT08.S1.CO predictors")
+
+plot(lm_9, which = 1)
+
+# vif < 5: 
+#indicates that predictors are not redunant (not providing overlapping data to inform response)
+vif(lm_9)
+
+```
+
+
+
+
+
+
