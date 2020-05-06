@@ -17,7 +17,7 @@ library(corrplot)
 ```
 
 
-## Air Quality data set
+## Air Quality data
 
 ```{r}
 airq_data <- read.table('/home/marina/Загрузки/AirQualityUCI.csv', sep = ';', header = TRUE, dec = ",")
