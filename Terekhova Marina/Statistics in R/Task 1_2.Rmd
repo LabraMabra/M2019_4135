@@ -1,0 +1,308 @@
+---
+title: "Task 1"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r include=FALSE}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(corrplot)
+```
+
+
+## Air Quality data set
+
+```{r}
+airq_data <- read.table('/home/marina/Загрузки/AirQualityUCI.csv', sep = ';', header = TRUE, dec = ",")
+
+```
+
+• Deleting NA columns and rows. Averaged concentration CO, Averaged Benzene concentration, Temperature, Humidity are factor columns in data, so it will be better to convert them into numeric. Actually, I don't need date and time for futher analysis, so I will slice the data.
+
+```{r}
+airq_data <- airq_data %>% select_if(~sum(!is.na(.)) > 0)  %>% drop_na()
+airq_data[c('CO.GT.', 'C6H6.GT.', 'T', 'RH', 'AH')] <-  sapply(airq_data[c('CO.GT.', 'C6H6.GT.', 'T', 'RH', 'AH')], as.numeric)
+airq_data <- airq_data[, c(3:15)]
+```
+
+• Replacing -200 to NA. 
+
+```{r}
+airq_data <- sapply(airq_data, function(x){ifelse (x == -200, NA, x)})
+airq_data <- as.data.frame(airq_data)
+```
+
+• Exploring the variables (I make it in a 3 parts to better visualizing)
+
+```{r}
+ggplot(gather(airq_data[, c(1:4)], cols, value), aes(x = value)) + 
+  geom_histogram(binwidth = 50) + facet_wrap(.~cols)
+```
+
+```{r}
+ggplot(gather(airq_data[, c(5:8)], cols, value), aes(x = value)) + 
+  geom_histogram(binwidth = 50) + facet_wrap(.~cols)
+
+```
+
+```{r}
+ggplot(gather(airq_data[, c(9:13)], cols, value), aes(x = value)) + 
+  geom_histogram(binwidth = 50) + facet_wrap(.~cols)
+```
+
+Ok, so it looks like a lot of variables have outliers and all of them in a different scale range
+So, as for me,  it will be better to log-transform the data
+
+• Log-transformation
+
+```{r message=FALSE, warning=FALSE}
+airq_data <- log10(airq_data)
+```
+
+So, let's look now as an example for the first 4 columns:
+
+```{r}
+ggplot(gather(airq_data[, c(1:4)], cols, value), aes(x = value)) + 
+  geom_histogram(binwidth = 0.1) + facet_wrap(.~cols)
+```
+
+• Relationships between all variables
+
+```{r}
+pairs(airq_data)
+```
+
+
+```{r}
+cor_data <- cor(airq_data, method = 'spearman', use = 'pairwise.complete.obs')
+corrplot(cor_data, method = 'circle')
+```
+
+
+
+Example of C6.H6.GT.:
+
+```{r message=FALSE, warning=FALSE}
+ggplot(airq_data, aes(x = CO.GT., y = C6H6.GT. )) + 
+  geom_point() + 
+  geom_smooth(method = 'lm')
+```
+
+```{r}
+model_CO.GT. <- airq_data  %>%
+   lm(data = .,  C6H6.GT. ~ CO.GT.)
+residuals(model_CO.GT.) %>% hist()
+```
+
+
+```{r}
+residuals(model_CO.GT.) %>% boxplot()
+```
+
+
+```{r}
+plot(model_CO.GT., which = c(1,2))
+```
+```{r}
+summary(model_CO.GT.)
+```
+
+So I decided to take a PT08.S3.NOx. as a predictor, because for me it seems a little bit better.
+I checked the assumptions for each variable and took 4 best:
+
+1) PT08.S5.O3.
+
+```{r message=FALSE, warning=FALSE}
+ggplot(airq_data, aes(x = PT08.S5.O3., y = PT08.S3.NOx. )) + 
+  geom_point() + 
+  geom_smooth(method = 'lm')
+```
+
+```{r}
+model_PT08.S5.O3. <- airq_data %>% lm(data = ., PT08.S3.NOx. ~ PT08.S5.O3., na.action = na.exclude)
+residuals(model_PT08.S5.O3.) %>% hist()
+```
+
+
+```{r}
+residuals(model_PT08.S5.O3.) %>% boxplot()
+```
+
+
+```{r}
+plot(model_PT08.S5.O3., which = c(1,2))
+```
+
+```{r message=FALSE, warning=FALSE}
+summary(model_PT08.S5.O3.)
+```
+
+Prediction:
+
+```{r paged.print=FALSE}
+test_subset_PT08.S5.O3. <-  airq_data[which(row.names(airq_data) %in% sample(row.names(airq_data), 25, replace = FALSE)), c(10,7)]
+test_PT08.S5.O3. <- data.frame(PT08.S5.O3. = test_subset_PT08.S5.O3.$PT08.S5.O3.)
+test_subset_PT08.S5.O3.$pred_PT08.S3.NOx. <- predict(model_PT08.S5.O3., newdata = test_PT08.S5.O3.)
+colnames(test_subset_PT08.S5.O3.) <- c('real_PT08.S5.O3.', 'real_PT08.S3.NOx.', 'pred_PT08.S3.NOx.')
+head(test_subset_PT08.S5.O3.)
+```
+      
+```{r message=FALSE, warning=FALSE}
+R <- round(summary(model_PT08.S5.O3.)$adj.r.squared, digits = 4)
+p <- round(summary(model_PT08.S5.O3.)$coefficients[2,4], digits = 3)
+titl <- paste('R^2 =', as.character(R),', p-val =', as.character(p))
+ggplot() + 
+  geom_point(data = airq_data, aes(PT08.S5.O3., PT08.S3.NOx.)) + 
+  geom_smooth(data = airq_data, aes(PT08.S5.O3., PT08.S3.NOx.), method = 'lm') +
+  geom_point(data = test_subset_PT08.S5.O3., aes(real_PT08.S5.O3., real_PT08.S3.NOx.), color = 'red') + 
+  geom_point(data = test_subset_PT08.S5.O3., aes(real_PT08.S5.O3., pred_PT08.S3.NOx.), color = 'green') +
+  labs(title = titl)
+```
+
+3) PT08.S2.NMHC.
+
+```{r message=FALSE, warning=FALSE}
+ggplot(airq_data, aes(x = PT08.S2.NMHC., y = PT08.S3.NOx. )) + 
+  geom_point() + 
+  geom_smooth(method = 'lm')
+```
+
+```{r}
+model_PT08.S2.NMHC. <- airq_data  %>% lm(data = .,  PT08.S3.NOx. ~ PT08.S2.NMHC.)
+residuals(model_PT08.S2.NMHC.) %>% hist()
+```
+
+
+```{r}
+residuals(model_PT08.S2.NMHC.) %>% boxplot()
+```
+
+
+```{r}
+plot(model_PT08.S2.NMHC., which = c(1,2))
+```
+
+```{r message=FALSE, warning=FALSE}
+summary(model_PT08.S2.NMHC.)
+```
+
+Prediction:
+
+```{r paged.print=FALSE}
+test_subset_PT08.S2.NMHC. <-  airq_data[which(row.names(airq_data) %in% sample(row.names(airq_data), 25, replace = FALSE)), c(5,7)]
+test_PT08.S2.NMHC. <- data.frame(PT08.S2.NMHC. = test_subset_PT08.S2.NMHC.$PT08.S2.NMHC.)
+test_subset_PT08.S2.NMHC.$pred_PT08.S3.NOx. <- predict(model_PT08.S2.NMHC., newdata = test_PT08.S2.NMHC.)
+colnames(test_subset_PT08.S2.NMHC.) <- c('real_PT08.S2.NMHC.', 'real_PT08.S3.NOx.', 'pred_PT08.S3.NOx.')
+head(test_subset_PT08.S2.NMHC.)
+```
+
+```{r message=FALSE, warning=FALSE}
+R <- round(summary(model_PT08.S2.NMHC.)$adj.r.squared, digits = 3)
+p <- round(summary(model_PT08.S2.NMHC.)$coefficients[2,4], digits = 3)
+titl <- paste('R^2 =', as.character(R),', p-val =', as.character(p))
+ggplot() + 
+  geom_point(data = airq_data, aes(PT08.S2.NMHC., PT08.S3.NOx.)) + 
+  geom_smooth(data = airq_data, aes(PT08.S2.NMHC., PT08.S3.NOx.), method = 'lm') +
+  geom_point(data = test_subset_PT08.S2.NMHC., aes(real_PT08.S2.NMHC., real_PT08.S3.NOx.), color = 'red') + 
+  geom_point(data = test_subset_PT08.S2.NMHC., aes(real_PT08.S2.NMHC., pred_PT08.S3.NOx.), color = 'green') +
+  labs(title = titl)
+```
+
+3) PT08.S1.CO.
+
+```{r message=FALSE, warning=FALSE}
+ggplot(airq_data, aes(x = PT08.S1.CO., y = PT08.S3.NOx. )) + 
+  geom_point() + 
+  geom_smooth(method = 'lm')
+```
+
+```{r}
+model_PT08.S1.CO. <- airq_data  %>% lm(data = .,  PT08.S3.NOx. ~ PT08.S1.CO.)
+residuals(model_PT08.S1.CO.) %>% hist()
+```
+
+
+```{r}
+plot(model_PT08.S1.CO., which = c(1,2))
+```
+
+```{r message=FALSE, warning=FALSE}
+summary(model_PT08.S1.CO.)
+```
+
+Prediction:
+
+```{r paged.print=FALSE}
+test_subset_PT08.S1.CO. <-  airq_data[which(row.names(airq_data) %in% sample(row.names(airq_data), 25, replace = FALSE)), c(2,7)]
+test_PT08.S1.CO. <- data.frame(PT08.S1.CO. = test_subset_PT08.S1.CO.$PT08.S1.CO.)
+test_subset_PT08.S1.CO.$pred_PT08.S3.NOx. <- predict(model_PT08.S1.CO., newdata = test_PT08.S1.CO.)
+colnames(test_subset_PT08.S1.CO.) <- c('real_PT08.S1.CO.', 'real_PT08.S3.NOx.', 'pred_PT08.S3.NOx.')
+head(test_subset_PT08.S1.CO.)
+```
+
+```{r message=FALSE, warning=FALSE}
+R <- round(summary(model_PT08.S1.CO.)$adj.r.squared, digits = 3)
+p <- round(summary(model_PT08.S1.CO.)$coefficients[2,4], digits = 3)
+titl <- paste('R^2 =', as.character(R),', p-val =', as.character(p))
+ggplot() + 
+  geom_point(data = airq_data, aes(PT08.S1.CO., PT08.S3.NOx.)) + 
+  geom_smooth(data = airq_data, aes(PT08.S1.CO., PT08.S3.NOx.), method = 'lm') +
+  geom_point(data = test_subset_PT08.S1.CO., aes(real_PT08.S1.CO., real_PT08.S3.NOx.), color = 'red') + 
+  geom_point(data = test_subset_PT08.S1.CO., aes(real_PT08.S1.CO., pred_PT08.S3.NOx.), color = 'green') +
+  labs(title = titl)
+```
+
+4) NMHC.GT. - there are a lot of missing data, but it was just interesting that for the rest data the model and prediction is very good.
+*But, of course we should not use this model, due to missing a lot of data.
+
+```{r message=FALSE, warning=FALSE}
+ggplot(airq_data, aes(x = NMHC.GT., y = PT08.S3.NOx.)) + 
+  geom_point() + 
+  geom_smooth(method = 'lm')
+```
+
+```{r}
+model_NMHC.GT. <- airq_data %>%  lm(data = ., PT08.S3.NOx.~ NMHC.GT., na.action = na.exclude)
+residuals(model_NMHC.GT.) %>% hist()
+```
+```{r}
+residuals(model_NMHC.GT.) %>% boxplot()
+```
+
+
+```{r}
+plot(model_NMHC.GT., which = c(1,2))
+```
+
+```{r message=FALSE, warning=FALSE}
+summary(model_NMHC.GT.)
+```
+
+Prediction:
+
+```{r paged.print=FALSE}
+airq_data_2 <- airq_data %>% drop_na()
+test_subset_NMHC.GT. <-  airq_data_2[which(row.names(airq_data_2) %in% sample(row.names(airq_data_2), 25, replace = FALSE)), c(3,7)]
+test_NMHC.GT. <- data.frame(NMHC.GT. = test_subset_NMHC.GT.$NMHC.GT.)
+test_subset_NMHC.GT.$pred_PT08.S3.NOx. <- predict(model_NMHC.GT., newdata = test_NMHC.GT.)
+colnames(test_subset_NMHC.GT.) <- c('real_NMHC.GT.', 'real_PT08.S3.NOx.', 'pred_PT08.S3.NOx.')
+head(test_subset_NMHC.GT.)
+```
+```{r message=FALSE, warning=FALSE}
+R <- round(summary(model_NMHC.GT.)$adj.r.squared, digits = 3)
+p <- round(summary(model_NMHC.GT.)$coefficients[2,4], digits = 3)
+titl <- paste('R^2 =', as.character(R),', p-val =', as.character(p))
+ggplot() + 
+  geom_point(data = airq_data, aes(NMHC.GT., PT08.S3.NOx.)) + 
+  geom_smooth(data = airq_data, aes(NMHC.GT., PT08.S3.NOx.), method = 'lm') +
+  geom_point(data = test_subset_NMHC.GT., aes(real_NMHC.GT., real_PT08.S3.NOx.), color = 'red') + 
+  geom_point(data = test_subset_NMHC.GT., aes(real_NMHC.GT., pred_PT08.S3.NOx.), color = 'green') +
+  labs(title = titl)
+```
