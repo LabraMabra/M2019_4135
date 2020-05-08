@@ -1,0 +1,337 @@
+---
+title: "Homework2_2"
+author: "Valeriia"
+date: "31 03 2020"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r message=FALSE, warning=FALSE}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(ggplot2)
+library(reshape2)
+library(data.table)
+library(broom)
+library(olsrr)
+library(corrplot)
+library(plotly)
+```
+
+Import data
+
+```{r}
+setwd("D:/Project")
+air <- read.csv("Air.csv", sep=";", dec=",")
+air <- air[,-c(16, 17)]
+```
+
+Make it long and check data.
+We can see outliers in -200 - replace it with NA. We can see that one of columns - Non Metanic HydroCarbons concentration have a lot of NAs. Let's drop it and then drop NAs. We saved data loosing one column.
+Also we can notice that not all columns have normal distribution
+
+```{r message=FALSE}
+str(air)
+for (i in 3:ncol(air)) {
+  air[,i][which(air[,i] == -200)] <- NA
+}
+air_long <- melt(air)
+air_long <- air_long[,-c(1,2)]
+ggplot(air_long, aes(value)) + 
+  geom_histogram() + 
+  facet_wrap(~variable, scales = "free")
+air <- air[,c(1:4,6:15)]
+air <- drop_na(air)
+air_long <- melt(air)
+air_long <- air_long[,-c(1,2)]
+summary(air)
+```
+
+So, we need to normolize our data.
+```{r}
+normalize <- function(x) {
+return ((x - min(x)) / (max(x) - min(x)))
+}
+air_norm <- as.data.frame(lapply(air[3:14], normalize))
+air_long <- melt(air_norm)
+```
+
+Check our data. Quantile - the proportion of cases that are less than certain values. If the requirements of "normality" are here - the data should lie on a diagonal line.
+We can see that several columns do not have normal distribution.
+
+```{r}
+#CO.GT
+qqnorm(air_norm$CO.GT., pch = 1, frame = FALSE)
+qqline(air_norm$CO.GT., col = "steelblue", lwd = 2)
+#PT08.S1.CO
+qqnorm(air_norm$PT08.S1.CO., pch = 1, frame = FALSE)
+qqline(air_norm$PT08.S1.CO., col = "steelblue", lwd = 2)
+#C6H6.GT
+qqnorm(air_norm$C6H6.GT., pch = 1, frame = FALSE)
+qqline(air_norm$C6H6.GT., col = "steelblue", lwd = 2)
+#PT08.S2.NMHC
+qqnorm(air_norm$PT08.S2.NMHC., pch = 1, frame = FALSE)
+qqline(air_norm$PT08.S2.NMHC., col = "steelblue", lwd = 2)
+#NOx.GT
+qqnorm(air_norm$NOx.GT., pch = 1, frame = FALSE)
+qqline(air_norm$NOx.GT., col = "steelblue", lwd = 2)
+#PT08.S3.NOx
+qqnorm(air_norm$PT08.S3.NOx., pch = 1, frame = FALSE)
+qqline(air_norm$PT08.S3.NOx., col = "steelblue", lwd = 2)
+#NO2.GT
+qqnorm(air_norm$NO2.GT., pch = 1, frame = FALSE)
+qqline(air_norm$NO2.GT., col = "steelblue", lwd = 2)
+#PT08.S4.NO2
+qqnorm(air_norm$PT08.S4.NO2., pch = 1, frame = FALSE)
+qqline(air_norm$PT08.S4.NO2., col = "steelblue", lwd = 2)
+#PT08.S5.O3
+qqnorm(air_norm$PT08.S5.O3., pch = 1, frame = FALSE)
+qqline(air_norm$PT08.S5.O3., col = "steelblue", lwd = 2)
+#T
+qqnorm(air_norm$T, pch = 1, frame = FALSE)
+qqline(air_norm$T, col = "steelblue", lwd = 2)
+#RH
+qqnorm(air_norm$RH, pch = 1, frame = FALSE)
+qqline(air_norm$RH, col = "steelblue", lwd = 2)
+#AH
+qqnorm(air_norm$AH, pch = 1, frame = FALSE)
+qqline(air_norm$AH, col = "steelblue", lwd = 2)
+```
+
+Response C6H6.GT. We can see columns that have linear response to C6H6.GT.
+
+```{r}
+mod <- lm(data = air_norm, C6H6.GT. ~ CO.GT.)
+summary(mod)
+augment(mod)%>%
+   ggplot(aes(x = CO.GT., y = C6H6.GT.))+
+  geom_point()+
+  geom_line(aes(y= .fitted), color = "blue", size = 1)
+residuals(mod) %>% hist(main = "Residuals CO.GT.")
+plot(mod, which = 1)
+
+mod1 <- lm(data = air_norm, C6H6.GT. ~ PT08.S1.CO.)
+summary(mod1)
+augment(mod1)%>%
+   ggplot(aes(x = PT08.S1.CO., y = C6H6.GT.))+
+  geom_point()+
+  geom_line(aes(y= .fitted), color = "blue", size = 1)
+residuals(mod1) %>% hist(main = "Residuals PT08.S1.CO.")
+plot(mod1, which = 1)
+
+mod2 <- lm(data = air_norm, C6H6.GT. ~ PT08.S2.NMHC.)
+summary(mod2)
+augment(mod2)%>%
+   ggplot(aes(x = PT08.S2.NMHC., y = C6H6.GT.))+
+  geom_point()+
+  geom_line(aes(y= .fitted), color = "blue", size = 1)
+residuals(mod2) %>% hist(main = "Residuals PT08.S2.NMHC.")
+plot(mod2, which = 1)
+
+mod3 <- lm(data = air_norm, C6H6.GT. ~ NOx.GT.)
+summary(mod3)
+augment(mod3)%>%
+   ggplot(aes(x = NOx.GT., y = C6H6.GT.))+
+  geom_point()+
+  geom_line(aes(y= .fitted), color = "blue", size = 1)
+residuals(mod3) %>% hist(main = "Residuals NOx.GT.")
+plot(mod3, which = 1)
+
+mod4 <- lm(data = air_norm, C6H6.GT. ~ PT08.S3.NOx.)
+summary(mod4)
+augment(mod4)%>%
+   ggplot(aes(x = PT08.S3.NOx., y = C6H6.GT.))+
+  geom_point()+
+  geom_line(aes(y= .fitted), color = "blue", size = 1)
+residuals(mod4) %>% hist(main = "Residuals PT08.S3.NOx.")
+plot(mod4, which = 1)
+
+mod5 <- lm(data = air_norm, C6H6.GT. ~ NO2.GT.)
+summary(mod5)
+augment(mod5)%>%
+   ggplot(aes(x = NO2.GT., y = C6H6.GT.))+
+  geom_point()+
+  geom_line(aes(y= .fitted), color = "blue", size = 1)
+residuals(mod5) %>% hist(main = "Residuals NO2.GT.")
+plot(mod5, which = 1)
+
+mod6 <- lm(data = air_norm, C6H6.GT. ~ PT08.S4.NO2.)
+summary(mod6)
+augment(mod6)%>%
+   ggplot(aes(x = PT08.S4.NO2., y = C6H6.GT.))+
+  geom_point()+
+  geom_line(aes(y= .fitted), color = "blue", size = 1)
+residuals(mod6) %>% hist(main = "Residuals PT08.S4.NO2.")
+plot(mod6, which = 1)
+
+mod7 <- lm(data = air_norm,C6H6.GT.  ~ PT08.S5.O3.)
+summary(mod7)
+augment(mod7)%>%
+   ggplot(aes(x = PT08.S5.O3., y = C6H6.GT.))+
+  geom_point()+
+  geom_line(aes(y= .fitted), color = "blue", size = 1)
+residuals(mod7) %>% hist(main = "Residuals PT08.S5.O3.")
+plot(mod7, which = 1)
+
+mod8 <- lm(data = air_norm,C6H6.GT. ~ `T`)
+summary(mod8)
+augment(mod8)%>%
+   ggplot(aes(x = `T`, y = C6H6.GT.))+
+  geom_point()+
+  geom_line(aes(y= .fitted), color = "blue", size = 1)
+residuals(mod8) %>% hist(main = "Residuals T")
+plot(mod8, which = 1)
+
+mod9 <- lm(data = air_norm, C6H6.GT. ~ RH)
+summary(mod9)
+augment(mod9)%>%
+   ggplot(aes(x = RH, y = C6H6.GT.))+
+  geom_point()+
+  geom_line(aes(y= .fitted), color = "blue", size = 1)
+residuals(mod9) %>% hist(main = "Residuals RH")
+plot(mod9, which = 1)
+
+mod10 <- lm(data = air_norm, C6H6.GT. ~ AH)
+summary(mod10)
+augment(mod10)%>%
+   ggplot(aes(x = AH, y = C6H6.GT.))+
+  geom_point()+
+  geom_line(aes(y= .fitted), color = "blue", size = 1)
+residuals(mod10) %>% hist(main = "Residuals AH")
+plot(mod10, which = 1)
+```
+
+```{r}
+pairs(air_norm[,sapply(air_norm, is.double)])
+```
+Check correlation.
+
+```{r}
+corrplot.mixed(cor(air_norm, method = "kendall"), number.cex = .7)
+```
+Check multicolinearity. I decided to see what's going on by hands. For multic. we need to have CI>30 and VIF>10. Also, we can see it when coeficients of columns alone are not significant but together they give significant p-value.
+
+```{r}
+# We can see multicolinearity here (a bit)
+# But it is not good case - all these columns can't be used because of their non linearity and low correlation
+mod <-  lm(C6H6.GT.~`T` + AH + RH, data = air_norm)
+summary(mod)
+X <- model.matrix(~`T` + AH + RH, data = air_norm)
+XX <- t(X) %*% X
+eigen <- eigen(XX)
+CI <- sqrt(max(eigen$values) / min(eigen$values))
+CI
+# Also can count it via formula 1/1-R^2
+ols_coll_diag(mod)
+residuals(mod) %>% hist(main = "Residuals T + AH + RH")
+plot(mod, which = 1)
+
+# No multicolinearity 
+mod <-  lm(C6H6.GT.~CO.GT. + NOx.GT., data = air_norm)
+summary(mod)
+X <- model.matrix(~CO.GT. + NOx.GT., data = air_norm)
+XX <- t(X) %*% X
+eigen <- eigen(XX)
+CI <- sqrt(max(eigen$values) / min(eigen$values))
+CI
+ols_coll_diag(mod)
+residuals(mod) %>% hist(main = "Residuals CO.GT. + NOx.GT.")
+plot(mod, which = 1)
+
+mod <-  lm(C6H6.GT.~NOx.GT. + NO2.GT. + AH, data = air_norm)
+summary(mod)
+X <- model.matrix(~NOx.GT. + NO2.GT. + AH, data = air_norm)
+XX <- t(X) %*% X
+eigen <- eigen(XX)
+CI <- sqrt(max(eigen$values) / min(eigen$values))
+CI
+ols_coll_diag(mod)
+residuals(mod) %>% hist(main = "Residuals NOx.GT. + NO2.GT. + AH")
+plot(mod, which = 1)
+
+mod <-  lm(C6H6.GT.~NOx.GT. + NO2.GT., data = air_norm)
+summary(mod)
+X <- model.matrix(~NOx.GT. + NO2.GT., data = air_norm)
+XX <- t(X) %*% X
+eigen <- eigen(XX)
+CI <- sqrt(max(eigen$values) / min(eigen$values))
+CI
+ols_coll_diag(mod)
+residuals(mod) %>% hist(main = "Residuals NOx.GT. + NO2.GT.")
+plot(mod, which = 1)
+
+mod <-  lm(C6H6.GT.~CO.GT. + PT08.S1.CO. + PT08.S5.O3., data = air_norm)
+summary(mod)
+X <- model.matrix(~CO.GT. + PT08.S1.CO. + PT08.S5.O3., data = air_norm)
+XX <- t(X) %*% X
+eigen <- eigen(XX)
+CI <- sqrt(max(eigen$values) / min(eigen$values))
+CI
+ols_coll_diag(mod)
+residuals(mod) %>% hist(main = "Residuals CO.GT. + PT08.S1.CO. + PT08.S5.O3.")
+plot(mod, which = 1)
+```
+Final model
+Residuals should be normally distributed and the Q-Q Plot will show this. If residuals follow close to a straight line on this plot, it is a good indication they are normally distributed.
+```{r}
+# Good model but NOx.GT. not normally distributed
+# I've decided not to transform data, because I don't want to see log-log transformation
+mod <-  lm(C6H6.GT.~NOx.GT. + NO2.GT. + PT08.S4.NO2., data = air_norm)
+summary(mod)
+X <- model.matrix(~NOx.GT. + NO2.GT. + PT08.S4.NO2., data = air_norm)
+XX <- t(X) %*% X
+eigen <- eigen(XX)
+CI <- sqrt(max(eigen$values) / min(eigen$values))
+CI
+ols_coll_diag(mod)
+ols_plot_resid_fit_spread(mod)
+ols_plot_obs_fit(mod)
+
+mod <-  lm(C6H6.GT.~CO.GT. + PT08.S4.NO2., data = air_norm)
+summary(mod)
+X <- model.matrix(~CO.GT. + PT08.S4.NO2., data = air_norm)
+XX <- t(X) %*% X
+eigen <- eigen(XX)
+CI <- sqrt(max(eigen$values) / min(eigen$values))
+CI
+ols_coll_diag(mod)
+ols_plot_resid_fit_spread(mod)
+ols_plot_obs_fit(mod)
+```
+
+Separated data in 75:25%
+We can see that R^2 is close to 1 which says about linear dependence. P-value is close to 0 - independent variables explain the dynamics of the dependent variable.
+
+```{r message=FALSE, warning=FALSE}
+set.seed(2)
+sep <- sample.int(n = nrow(air_norm), size = floor(.75*nrow(air_norm)))
+train <- air_norm[sep,]
+test <- air_norm[-sep,]
+train1 <- train[,c('C6H6.GT.', 'CO.GT.', 'PT08.S4.NO2.')]
+test1 <- test[,c('C6H6.GT.', 'CO.GT.', 'PT08.S4.NO2.')]
+mod1 <- lm(C6H6.GT.~CO.GT. + PT08.S4.NO2., data = train1)
+a1 <- summary(mod1)
+pred1 <- predict(mod1, newdata = test1)
+test1$C6H6.GT._pred <- pred1
+head(test1)
+test1 <- rbindlist(list(test1[,c(2,3,1)], test1[,c(2,3,4)]))
+train1$type <- 'train'
+test1$type <- 'test'
+test1[1:(nrow(test1)/2),4] <- 'real value'
+all <- rbind(train1, test1)
+plot_ly(data = all,
+        z = ~C6H6.GT.,
+        y = ~PT08.S4.NO2.,
+        x = ~CO.GT., opacity = 0.7, color = ~type)%>%
+  layout(title = paste("R2", round(a1$r.squared, 3),
+                                  sep = ": "),
+                            paste("pvalue", 2.2e-16, sep = ": "),
+         xaxis = list(title = "CO.GT.",
+                      zeroline = FALSE),
+         yaxis = list(title = "PT08.S4.NO2.",
+                      zeroline = FALSE),
+         zaxis = list(title = "C6H6.GT.",
+                      zeroline = FALSE))
+```
