@@ -1,0 +1,208 @@
+---
+title: "Task 22"
+author: "Lisa Skalon"
+date: "5/1/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, error = FALSE, message = FALSE)
+```
+
+
+```{r results="hide"}
+library('ggplot2')
+library('ggpubr')
+library('dplyr')
+library('tidyr')
+library('broom')
+library('lubridate')
+library('reshape2')
+library('car')
+
+```
+
+
+## Airquality - part 2
+
+We read df again and clean it almost the same as in the part 1. 
+```{r}
+# read
+df <- read.csv("./AirQualityUCI.csv", stringsAsFactors = FALSE, sep = ';')
+
+# examine the data structure
+str(df)
+
+# convert date and time to special type
+df$date_time = dmy_hms(paste(df$Date, df$Time))
+
+# remove unuseful cols
+df <- df[,c(3:15,18) ]
+
+# chr to numeric
+char_columns <- sapply(df, is.character)
+df[ , char_columns] <- lapply(df[ , char_columns] , function(x) as.numeric(gsub(",", ".", x)))
+
+# remove na
+df <- na.omit(df)
+
+# value -200 is suspicious
+# let values -200 be NA
+df_no200 <- df[, 1:13]
+df_no200[] <- sapply(df[, 1:13] , function(x) {x[grep("-200", x)] = NA; return((x))}) 
+str(df_no200)
+
+summary(df_no200)
+
+# We remove almost all suspicious values, but the column NMHC.GT. contains too many of them, 
+# so for that column we replace -200 with median, because we don`t want to loose information
+df_no200 <- df_no200[!(is.na(df_no200$AH) | is.na(df_no200$NO2.GT.) | is.na(df_no200$CO.GT.)),]
+
+df_narm <- replace(df_no200, TRUE, lapply(df_no200, function(x) replace(x, is.na(x), median(x, na.rm = TRUE))))
+
+summary(df_narm)
+
+```
+
+
+For exploring collinearity of predictors we can simple check for cross-correlations between 
+variables. If the correlation is greater than 0.8/lower than -0.8, probably these predictors
+depend on each other and should be removed from the analysis.
+
+```{r}
+# correlation heatmap - more comportable way to find cross-correlations
+cor_mtx <- (cor(df_narm))
+cor_mtx
+
+# heatmap
+ggplot(data = melt(cor_mtx), aes(Var2, Var1, fill = value))+
+ geom_tile(color = "black")+
+ theme(axis.text.x = element_text(angle = 90))+
+  coord_fixed()
+```
+
+Then 3 or more predictors depend on each other, we are talking about multicollinearity. 
+It can be measured by VIF score -the variance inflation factor, which evaluate how much the variance of a regression coefficient is inflated due to multicollinearity in the model. 
+We can calculate VIF for each predictor:
+
+```{r}
+fit <- lm(data = df_narm, formula =  C6H6.GT. ~ .-NMHC.GT. ) 
+summary(fit)
+
+vif(fit)
+
+```
+
+It seeams that many predictors have too big VIF score (>10). These predictors shouldn`t be
+included into our model.
+
+
+Now we can choose predictors which are significant and correlated with our response 
+but have low VIF score. Let`s try out some of them.
+
+
+First of all, we check the most significant predictors CO.GT. and  PT08.S2.NMHC.
+```{r}
+fit1 <- lm(data = df_narm, formula =  C6H6.GT. ~  CO.GT.  +  PT08.S2.NMHC.) 
+summary(fit1)
+
+vif(fit1)
+
+```
+VIF score for them is not very big, but quantiles are not symmetrical. 
+We can check the residuals of this model: residuals represent variation left unexplained by the model.
+
+```{r}
+plot(fit1, which=1, col=c("blue"))
+plot(fit1, which=2, col=c("red"))
+
+```
+The residuals doesn`t look linear. The are not normally distributed. The model is not good enough. 
+
+
+We will try to choose either CO.GT. or  PT08.S2.NMHC. as predictors because they both are 
+very significant but strongly correlated. 
+
+Let`s try PT08.S5.O3. and RH  
+```{r}
+fit2 <- lm(data = df_narm, formula =  C6H6.GT. ~  CO.GT.  +  PT08.S5.O3. + RH) 
+summary(fit2)
+
+vif(fit2)
+
+```
+
+
+```{r}
+plot(fit2, which=1, col=c("blue"))
+plot(fit2, which=2, col=c("red"))
+
+```
+
+Quantiles are symmetrical, VIF is ok, residuals show linearity and are almost normally distributed. 
+
+
+```{r}
+fit3 <- lm(data = df_narm, formula =  C6H6.GT. ~  PT08.S5.O3.+ PT08.S3.NOx.) 
+summary(fit3)
+
+vif(fit3)
+
+```
+
+
+```{r}
+plot(fit3, which=1, col=c("blue"))
+plot(fit3, which=2, col=c("red"))
+
+```
+We have some problems with residuals here.
+
+
+```{r}
+fit4 <- lm(data = df_narm, formula =  C6H6.GT. ~ CO.GT. + PT08.S5.O3. + NO2.GT. ) 
+summary(fit4)
+vif(fit4)
+
+```
+
+```{r}
+plot(fit4, which=1, col=c("blue"))
+plot(fit4, which=2, col=c("red"))
+
+```
+Residuals look ok, quantiles are ok, this model is the best one.
+
+So, we will choose model 4: C6H6.GT. ~ CO.GT. + PT08.S5.O3. + NO2.GT.
+
+
+Should we transform our data somehow? Let`s check the distribution of variables.
+
+```{r}
+df_narm%>%
+  mutate(id=c(1:nrow(df_narm)))%>%
+  melt(measure.vars=c(1:13))->long
+
+ggplot(long, aes(value)) + 
+  geom_histogram(bins=40) + 
+  facet_wrap(~variable, scales = "free")
+
+```
+Not all of the variables look normal. Let`s try log transformation.
+
+```{r}
+fitlog <- lm(data = df_narm, formula =  log(C6H6.GT.) ~ log(CO.GT.) + log(PT08.S5.O3.) + log(NO2.GT.) ) 
+summary(fitlog)
+vif(fitlog)
+
+```
+
+```{r}
+plot(fitlog, which=1, col=c("blue"))
+plot(fitlog, which=2, col=c("red"))
+
+```
+
+Residuals look a bit skewed.
+
+# So, we choose model 4 as the final model (C6H6.GT. ~ CO.GT. + PT08.S5.O3. + NO2.GT.)
