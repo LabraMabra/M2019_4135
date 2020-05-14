@@ -1,0 +1,232 @@
+---
+title: "HW2.3"
+author: "Mary Futey"
+date: "5/5/2020"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r Libraries, include=FALSE}
+library(mlbench)
+library(ggplot2)
+library(dplyr)
+library(caret)
+library(boot)
+library(tree)
+library(class)
+library(corrplot)
+library(ggfortify)
+library(RColorBrewer)
+
+```
+
+## Load data check, dimensions, structure and for NAs 
+
+
+```{r load dataset and explore}
+data(BostonHousing)
+boston <- BostonHousing
+str(boston)
+print(paste0("cols: ", ncol(boston)))
+print(paste0("# rows: ", nrow(boston)))
+
+#check for NAs: looks good
+sum(is.na(boston))
+
+# 506 observations, 13 predictors 
+
+# remove Charles river variable
+boston_sub <- boston[, c(1:3, 5:14)]
+
+```
+
+
+
+
+## correlation plot 
+
+
+```{r}
+cor_data <- cor(boston_sub, method ='pearson', use = 'pairwise.complete.obs') 
+p1 <- corrplot.mixed(cor_data, lower ='number',tl.offset = 1, tl.cex= 1,
+                     tl.col = "black", number.cex = 0.7, tl.pos='lt',
+                     lower.col=rainbow(10), upper.col=rainbow(10))
+
+
+
+p1
+```
+
+
+
+## Create categorial variable to do classification
+
+
+```{r categorical variable}
+
+# create categorical medv (Median house value) 
+quant_00  = min(boston_sub$medv)
+quant_25  = quantile(boston_sub$medv, 0.25)
+quant_50  = quantile(boston_sub$medv, 0.50)
+quant_75  = quantile(boston_sub$medv, 0.75)
+quant_100 = max(boston_sub$medv)
+
+rb = rbind(quant_00, quant_25, quant_50, quant_75, quant_100)
+dimnames(rb)[[2]] = "Value"
+
+boston_sub$medv_F[boston$medv >= quant_00 & 
+                   boston_sub$medv < quant_25]  = "first"
+boston_sub$medv_F[boston$medv >= quant_25 & 
+                   boston_sub$medv <  quant_50]  = "second"
+boston_sub$medv_F[boston$medv >= quant_50 & 
+                   boston_sub$medv <= quant_75] = "third"
+boston_sub$medv_F[boston$medv >= quant_75 & 
+                   boston_sub$medv <= quant_100] = "fourth"
+boston_sub$medv_F = factor(boston_sub$medv_F,
+                    levels=c("first", "second", "third", "fourth"))
+
+# check numbers in each class 
+table(boston_sub$medv_F)
+
+# remove numerical medv
+boston_df <- boston_sub[,-13]
+
+str(boston_df)
+
+```
+## pca
+
+```{r pca}
+# pca to check clusters
+boston_pca <- boston_df[, -13]
+pca <- prcomp(boston_pca, center = TRUE,
+              scale. = TRUE) 
+
+autoplot(pca, data = boston_df, colour = "medv_F")
+
+
+```
+
+
+## knn 
+
+```{r knn}
+
+set.seed(33)
+
+# create knn model
+# should we exclude the response from the dataset?
+knn <- train(medv_F ~ ., 
+               data = boston_df, 
+               method = "knn",
+  # set 10-fold cross validation        
+  trControl = trainControl("cv", number = 5),
+  # normalize data
+  preProcess = c("center","scale"),
+  # number of k values to check
+  tuneLength = 50,
+  metric = "Accuracy"
+  )
+knn
+
+# plot knn model 
+plot(knn)
+
+# best tuning parameter for k that minimizes MSE
+print(paste0("best k to minimize MSE: ", knn$bestTune))
+
+```
+
+## Test the model
+```{r}
+set.seed(33)
+# create test set
+test <- sample(nrow(boston_df), 0.8*nrow(boston_df)) 
+
+# test model with k = 9
+knn_test <- knn(train = boston_df[-test, -13, drop = F],
+                test = boston_df[test, -13, drop = F],
+                cl = boston_df[-test, "medv_F"],
+                k = 9)
+
+# check the accuracy
+table(knn_test, Real = boston_df[test, "medv_F"])
+
+(72+45+50+46)/405
+
+```
+
+
+
+## logistic regression
+
+
+
+```{r}
+
+# need to make a binomial variable
+mean(boston$medv)
+boston_bi <- boston_sub %>% mutate(medv_bi = ifelse(medv >= 22.5, "high", "low")) %>% 
+  mutate(medv_bi = factor(medv_bi, levels = c("high", "low")))
+
+boston_bi <- boston_bi[,-c(13:14)]
+
+set.seed(3)
+
+cv.err <- 1:5
+# use i index to determine power of polynomial 
+# on each iteration, create the model for the given power and est MSE
+for (i in 1:5){
+  gl <- glm(medv_bi ~ poly(rm, i), family = "binomial",
+            data = boston_bi)
+  cv.err[i] <- cv.glm(boston_bi, gl)$delta[1]
+}
+cv.err
+
+plot(x = 1:5, y = cv.err,
+     xlab = 'Polynomial degree', ylab='Cross-validation')
+
+
+```
+
+
+
+```{r log regression}
+
+# use 3rd degree
+
+glm <- glm(medv_bi ~ poly(rm, 3), data = boston_bi, family = "binomial")
+summary(glm)
+
+pred_glm <- predict(glm, type = "response") > 0.5
+table(pred_glm, Real = boston_bi[, 13])
+
+```
+
+
+
+
+```{r log 2}
+# test
+glm2  <- glm(medv_bi ~ rm, data = boston_bi[-test, ],
+                  family = "binomial")
+summary(glm2)
+
+pred_glm2 <- predict(glm2, type = "response", newdata = boston_bi[test, ]) > 0.5
+table(pred_glm2, Real = boston_bi[test, 13])
+
+
+```
+
+
+
+
+
+
+
