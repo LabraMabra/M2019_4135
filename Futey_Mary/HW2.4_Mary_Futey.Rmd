@@ -1,0 +1,358 @@
+---
+title: "HW2.4_Mary_Futey"
+author: "Mary Futey"
+date: "5/8/2020"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r libraries}
+library(tree)
+library(rpart)
+library(randomForest)
+library(MASS)
+library(gbm)
+```
+
+## Load dataset
+
+```{r }
+boston <- Boston
+str(boston)
+
+```
+
+## bagging method
+
+
+```{r }
+set.seed(1)
+# 50% samples are test, train
+train <- sample(1:nrow(boston), nrow(boston)/2)
+
+# 14 variables, 1 is response, others predictors
+bag <- randomForest(lstat ~ ., data = boston,
+                    subset = train,
+                    # n - number of rows (obvs), m - number of features 
+                    #mtry: how many features to try (13 default =# of predictors)
+                    mtry = 13,
+                    #imp. of each predictor, how much it influences result and error
+                    importance = T) 
+# plot error vs trees
+plot(bag)
+
+#summary contains more (complicated) information
+#type is regression (if response is numerical: regression, if factor: classification)
+# % variance explained is similar to R^2
+bag
+```
+
+
+
+```{r }
+# 1st argument is the model, 2nd test data
+est_rm <- predict(bag, newdata = boston[-train,])
+
+# x-axis: est, y-axis: real, abline is if they are equal (0: intercept, 1: slope)
+plot(est_rm, boston$lstat[-train]); abline(0,1)
+
+#test error is higher (see next plot)
+mean((est_rm -boston$lstat[-train])^2)
+
+```
+# Plot test and out of bag error
+
+```{r }
+
+# 13 times (13 predictors)
+oob.err=double(13)
+test.err=double(13)
+
+#mtry is num of variables randomly chosen at each split
+for(mtry in 1:13) 
+{
+  rf=randomForest(lstat ~ . , data = boston , 
+                  subset = train,
+                  mtry=mtry,
+                  ntree=400) 
+  oob.err[mtry] = rf$mse[400] #error of all trees fitted
+  
+  pred<-predict(rf,boston[-train,]) #predictions on test set for each tree
+  test.err[mtry]= with(boston[-train,], 
+                       mean( (lstat - pred)^2)) #Mean Squared Test error
+  
+  cat(mtry," ") #printing the output to the console
+  
+}
+matplot(1:mtry , 
+        cbind(oob.err,test.err), 
+        pch=19 , 
+        col=c("red","blue"),
+        type="b",
+        ylab="Mean Squared Error",
+        xlab="Number of Predictors Considered at each Split")
+legend("topright",
+       legend=c("Out of Bag Error","Test Error"),
+       pch=19, 
+       col=c("red","blue"))
+```
+
+
+## random forest instead of bagging
+
+
+```{r }
+set.seed(1)
+
+#check fewer predictors
+rf <- randomForest(lstat ~ ., data = boston,
+                    subset = train,
+                    mtry = 6,
+                    ntree = 25,
+                    importance = T)
+est_lstat <- predict(rf, newdata = boston[-train,])
+# better than for bagging
+mean((est_lstat - boston$lstat[-train])^2)
+```
+
+
+
+
+```{r }
+# higher InceMSE and purity - better
+importance(rf)
+
+```
+
+
+
+
+
+```{r }
+
+# plots results of importance(), which are not sorted
+varImpPlot(rf)
+
+```
+
+
+
+```{r }
+
+summary(boston$lstat)
+# response can be split into 2-4 classes
+# should have approx same number of observations in each class
+hist(boston$lstat, breaks = 45)
+
+```
+
+
+
+
+
+```{r }
+# will work with two classes: above and below 12
+
+boston$lstat <- as.factor(ifelse(boston$lstat > 12, 1, 2))
+table(boston$lstat)
+```
+
+
+
+```{r }
+# sample size, n of N
+ceiling(0.632*nrow(boston[-train,]))
+
+# number of predictors to use (mtry), m of M
+floor(sqrt(ncol(boston)))
+
+```
+
+
+
+```{r }
+set.seed(1)
+#response is a factor so rf knows to do classification
+rf_class <- randomForest(lstat ~ ., data = boston,
+                    subset = train,
+                    mtry = 3,
+                    sampsize = 160,
+                    importance = T)
+
+rf_class
+  
+
+
+```
+
+
+```{r }
+
+#test 
+est_lstat <- predict(rf_class, newdata = boston[-train,]) 
+
+mean(est_lstat != boston$lstat[-train])
+
+
+# compare to OBB error rate, bad if test errror is larger than train
+# this is <15% from training above
+  
+
+
+```
+
+
+
+
+
+
+```{r }
+
+# trace option, tells function to caluclate result at intermediate steps
+# set ntrees, use in do.trace, so gives result every 50 trees 
+
+set.seed(1)
+ntrees <- 500
+rf_class <- randomForest(lstat ~ ., data = boston,
+                         subset = train,
+                         ntree = ntrees,
+                         mtry = 3,
+                         sampsize = 160, 
+                         importance = T, 
+                         do.trace = ntrees/10)
+
+
+# can see from OBB, error for 1st and 2nd class for every 50 trees
+# over feeding: adding trees does not improve the model
+
+rf_class
+  
+```
+
+
+
+
+```{r }
+# use less trees in forest
+set.seed(1)
+ntrees <- 50
+rf_class <- randomForest(lstat ~ ., data = boston,
+                         subset = train,
+                         ntree = ntrees,
+                         mtry = 3,
+                          sampsize = 160, 
+                         importance = T, 
+                         do.trace = ntrees/25)
+
+
+rf_class
+
+
+# can see from OBB, error for 1st and 2nd class for every 25 trees
+# calculate for every 2 trees 
+# can see 30 trees error is lower 
+
+```
+
+
+
+
+
+```{r }
+# take least number of trees with best result = 30 trees
+
+set.seed(1)
+ntrees <- 30
+rf_class <- randomForest(lstat ~ ., data = boston,
+                         subset = train,
+                         ntree = ntrees,
+                         mtry = 3,
+                         sampsize = 160,
+                         importance = T)
+rf_class
+
+
+```
+
+
+
+
+
+```{r }
+
+# calcluate error on test: less than original
+est_lstat <- predict(rf_class, newdata = boston[-train,]) 
+mean(est_lstat != boston$lstat[-train])
+
+```
+
+
+
+
+
+```{r }
+
+# check importance of features 
+# mean decrease and gini index: 
+
+varImpPlot(rf_class)
+
+```
+
+
+## gradient boosting machine
+
+```{r }
+
+# need to use integers(one or zero)
+
+# working with trees one by one (not parallel) 
+# takes errors and adds to the next model
+# so each step optimizes result based on errors 
+
+
+boston$lstat <- as.integer(ifelse(boston$lstat == 1, 1, 0))
+table(boston$lstat)
+
+```
+
+
+
+
+
+
+```{r }
+
+set.seed(1)
+ntrees <- 5000
+boost <- gbm(lstat ~ ., data = boston[train,],
+             distribution = "bernoulli",
+             n.trees = ntrees,
+             interaction.depth = 4,
+             shrinkage = 0.01)
+# medv and rm highest influence - not too suprising 
+summary(boost)
+
+```
+
+```{r }
+ # test
+est_lstat <- predict(boost, newdata = boston[-train,], 
+                     n.trees = ntrees, 
+                     type = "response") > 0 
+mean(est_lstat != boston$lstat[-train])
+
+```
+
+
+
+
+
+
