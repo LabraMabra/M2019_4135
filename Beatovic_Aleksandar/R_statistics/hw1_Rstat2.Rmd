@@ -1,0 +1,235 @@
+---
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Loading libraries
+```{r, include=FALSE}
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+library(reshape2)
+```
+
+##Anscombe's quartet
+This data set illustrates how variables even with identical numerical statistical properties when plotted are very different, proving the necessity of also plotting data. 
+
+```{r}
+df <- anscombe
+colnames(df)
+```
+
+```{r}
+df_combined <- rbind(data.frame(x=df$x1, y=df$y1, set="1"),
+                     data.frame(x=df$x2, y=df$y2, set="2"),
+                     data.frame(x=df$x3, y=df$y3, set="3"),
+                     data.frame(x=df$x4, y=df$y4, set="4"))
+#groups columns into pairs so that they can be facceted, set column is a factor
+
+```
+
+
+Scatter plot facceted by set
+```{r}
+df_combined %>% ggplot(aes(x, y)) + geom_point() + facet_wrap(~set)
+```
+
+Means and standard deviations by set
+```{r}
+df_combined %>% 
+  group_by(set) %>% 
+  summarise(mean_x = mean(x), mean_y = mean(y), sd_x = sd(x), sd_y = sd(y))
+```
+
+Pearsons, Kendalls and Spearmans test results by set and their respective p-values
+```{r}
+df_combined %>% 
+  group_by(set) %>% 
+  summarise(Pearson = cor(x,y, method = "pearson"), pValue_Pearson = cor.test(x,y, method = "pearson")$p.value,
+            Kendall = cor(x,y, method = "kendall"), pValue_Kendall = cor.test(x,y, method = "kendall")$p.value,
+            Spearman = cor(x,y, method = "spearman"), pValue_Spearman = cor.test(x,y, method = "spearman")$p.value,
+            )
+```
+
+Added geom smooth with method lm
+```{r}
+df_combined %>% ggplot(aes(x, y)) + geom_point() + facet_wrap(~set) + geom_smooth(method = lm)
+
+```
+
+
+##Air quality data set
+Data Set Information:
+
+The dataset contains 9358 instances of hourly averaged responses from an array of 5 metal oxide chemical sensors embedded in an Air Quality Chemical Multisensor Device. The device was located on the field in a significantly polluted area, at road level,within an Italian city. Data were recorded from March 2004 to February 2005 (one year)representing the longest freely available recordings of on field deployed air quality chemical sensor devices responses. Ground Truth hourly averaged concentrations for CO, Non Metanic Hydrocarbons, Benzene, Total Nitrogen Oxides (NOx) and Nitrogen Dioxide (NO2) and were provided by a co-located reference certified analyzer. Evidences of cross-sensitivities as well as both concept and sensor drifts are present as described in De Vito et al., Sens. And Act. B, Vol. 129,2,2008 (citation required) eventually affecting sensors concentration estimation capabilities. Missing values are tagged with -200 value.
+This dataset can be used exclusively for research purposes. Commercial purposes are fully excluded.
+
+Attribute Information:
+
+0 Date (DD/MM/YYYY)
+1 Time (HH.MM.SS)
+2 True hourly averaged concentration CO in mg/m^3 (reference analyzer)
+3 PT08.S1 (tin oxide) hourly averaged sensor response (nominally CO targeted)
+4 True hourly averaged overall Non Metanic HydroCarbons concentration in microg/m^3 (reference analyzer)
+5 True hourly averaged Benzene concentration in microg/m^3 (reference analyzer)
+6 PT08.S2 (titania) hourly averaged sensor response (nominally NMHC targeted)
+7 True hourly averaged NOx concentration in ppb (reference analyzer)
+8 PT08.S3 (tungsten oxide) hourly averaged sensor response (nominally NOx targeted)
+9 True hourly averaged NO2 concentration in microg/m^3 (reference analyzer)
+10 PT08.S4 (tungsten oxide) hourly averaged sensor response (nominally NO2 targeted)
+11 PT08.S5 (indium oxide) hourly averaged sensor response (nominally O3 targeted)
+12 Temperature in Â°C
+13 Relative Humidity (%)
+14 AH Absolute Humidity
+
+Loading csv file
+```{r}
+AQ_raw <- read.csv("/home/aleksandar/Desktop/R statistics 2/hw_1_Rstat2/AirQualityUCI/AirQualityUCI.csv", sep = ";")
+
+```
+
+Removing NAs
+Since missing values are denoted with -200 in this data set, first step would be to change all -200 values to NA and then remove NAs
+
+```{r}
+AQ_NAs <- AQ_raw %>% na_if(-200) %>% na_if("-200,0")
+#removing empty columns
+toDrop <- c("X", "X.1")
+AQ_NAs <- AQ_NAs[,!(names(AQ_NAs)) %in% toDrop]
+
+```
+
+Exploring NAs, after visually checking data set it seems most NAs are from NMHC.GT column
+```{r}
+sapply(AQ_NAs, function(x) sum(is.na(x)))
+```
+Since NMHC.GT has a lot of NAs using complete cases would drop about 90% of cases. I think its a good option to remove NMHC.GT from the main analyses.
+
+
+```{r}
+toDrop <- c("NMHC.GT.", "Date", "Time") #also dropped Date and Time colums since I wont be using them
+AQ_NAs <- AQ_NAs[,!(names(AQ_NAs)) %in% toDrop]
+complete_AQrows <- complete.cases(AQ_NAs)
+AQ <- AQ_NAs[complete_AQrows,]
+```
+
+
+Checking for non numeric variables
+```{r}
+sapply(AQ, function(x)is.numeric(x))
+
+AQnum <- data.frame(sapply(AQ, function(x) as.double(gsub(",",".",x)))) #converting to double
+
+sapply(AQnum, function(x)is.numeric(x))
+```
+
+Exploring the data individually 
+```{r}
+AQlong <- gather(AQnum)
+
+ggplot(AQlong, aes(value)) + geom_histogram() + facet_wrap(~key, scales = "free")
+  
+```
+
+```{r}
+ggplot(AQlong, aes(value)) + geom_boxplot() + facet_wrap(~key, scales = "free")
+
+```
+
+Finding pairwise correlations for data set
+Response for further analyses is C6H6.GT.
+
+```{r}
+sapply(AQnum, function(x) sapply(AQnum, function(y) cor(x,y)))
+
+```
+
+
+```{r}
+pairs(AQnum, )
+
+```
+
+
+##Visualising and inspecting some pairs of columns more closely
+
+```{r}
+d <- melt(AQnum, id.vars = "C6H6.GT.")
+ggplot(d, aes(x = value, y = C6H6.GT.)) + geom_point() + geom_smooth(method = lm) + facet_wrap(~variable, scales = "free")
+
+```
+
+
+
+All models with response C6H6
+```{r}
+depVarList = setdiff(colnames(AQnum), c("C6H6.GT."))
+
+allModels = lapply(depVarList, function(x){
+  lm(formula= paste0("C6H6.GT. ~ `", x, "`"), data= AQnum)})
+
+names(allModels) = depVarList
+print(lapply(allModels, function(x) summary(x)))
+```
+
+
+I decided to look into CO.GT as the most suitable predictor for C6H6
+```{r}
+ggplot(AQnum, aes( C6H6.GT., CO.GT.) ) + geom_point() + geom_smooth(method = lm)
+
+```
+
+Residuals are symetrical and mean is around zero, this means 
+```{r}
+modCO <-lm(formula = C6H6.GT. ~ CO.GT., data = AQnum)
+boxplot(modCO$residuals)
+```
+Residuals vs fitted - how well do fitted value align to residuals - it means residuals are euqally spread around the data
+```{r}
+plot(modCO, which = 1)
+```
+
+QQplot - are theoretical quantiles the same as actual ones - if they are on the line distribution is close to normal
+```{r}
+plot(modCO, which = 2)
+
+```
+
+Perfoming train vs test data LM analysis
+```{r}
+set.seed(42)
+sample <- sample.int(n = nrow(AQnum), size = floor(0.75 * nrow(AQnum)))
+train <- AQnum[sample,]
+test <- AQnum[-sample,]
+
+new_modCO <- lm(data = train, formula = C6H6.GT. ~ CO.GT.)
+summary(new_modCO)
+```
+
+```{r}
+ggplot(data = train,aes( C6H6.GT., CO.GT.) ) + geom_point() + geom_smooth(method = lm)
+
+
+```
+
+Prediction using trained model
+
+```{r}
+pred <- predict(new_modCO, newdata = test)
+test$CO.GT._predicted <- pred
+
+```
+
+Constructing plot
+```{r}
+ggplot() + geom_point(data = train, aes(x= CO.GT., y = C6H6.GT.)) + geom_smooth(data =train, aes(x=CO.GT., C6H6.GT.),method = lm) + geom_point(data = test,  colour = "red", aes(x= CO.GT., y = C6H6.GT.)) + geom_point(data = test,  colour = "green", aes(x= CO.GT. ,y = CO.GT._predicted)) + ggtitle("C6H6 vs CO, R^2: 0.865, p value: 2.2e-16")
+```
+
+
+
+
