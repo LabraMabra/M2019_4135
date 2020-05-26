@@ -1,0 +1,307 @@
+---
+title: "Task_2.1"
+author: "NataliaBaymacheva"
+date: "5/26/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Loading libraries
+```{r}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(corrplot)
+```
+
+Look at the data
+```{r}
+df <- anscombe
+head(df)
+```
+
+Converting the data to a better format
+```{r}
+df1 <- data.frame(cbind(df$x1, df$y1, 'set' = 1))
+df2 <- data.frame(cbind(df$x2, df$y2, 'set' = 2))
+df3 <- data.frame(cbind(df$x3, df$y3, 'set' = 3))
+df4 <- data.frame(cbind(df$x4, df$y4, 'set' = 4))
+df <- rbind(df1, df2, df3, df4)
+names(df)[names(df) == 'V1'] <- 'x'
+names(df)[names(df) == 'V2'] <- 'y'
+
+head(df)
+```
+
+Plotting the data
+```{r, message=FALSE, warning=FALSE}
+df %>%
+  ggplot(aes(x = x, y = y)) +
+  geom_point() +
+  facet_wrap(~set) +
+  geom_smooth()
+```
+
+Mean/sd summary table
+```{r}
+df %>%
+  group_by(set) %>%
+  summarise(mean_x=mean(x), sd_x = sd(x), mean_y=mean(y), sd_y = sd(y))
+```
+
+Pearson's/non-parametric summary table
+```{r, warning=FALSE}
+df %>%
+  group_by(set) %>%
+  summarise(pearson_est=cor.test(x, y)$estimate, pearson_p=cor.test(x, y)$p.value,
+            kendall_est=cor.test(x, y, method = 'kendall')$estimate, kendall_p=cor.test(x, y, method = 'kendall')$p.value,
+            spearman_est=cor.test(x, y, method = 'spearman')$estimate, spearman_p=cor.test(x, y, method = 'spearman')$p.value)
+```
+
+```{r}
+rm(list = ls())
+```
+
+AIRQUALITY DATA
+
+Loading libraries
+```{r}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(corrplot)
+```
+
+```{r}
+airquality_data <- read.csv2('~/R/AirQualityUCI.csv', sep = ';', blank.lines.skip = T)[,1:15]
+head(airquality_data)
+```
+
+There are many NA lines, get rid of them
+```{r}
+airquality_data <- drop_na(airquality_data)
+```
+
+Transforming dates to date types
+```{r}
+airquality_data$Date <- as.Date(airquality_data$Date)
+```
+
+Checcking the structures of the cols
+```{r}
+str(airquality_data)
+```
+
+Change all -200 to na
+```{r}
+for (col in 3:15) {
+  airquality_data[which(airquality_data[col] == -200), col] <- NA
+}
+```
+
+Check distributions
+```{r}
+airquality_long <- pivot_longer(airquality_data, cols = 3:15, names_to = 'measure', values_to = 'value', values_drop_na = T)
+airquality_long %>%
+  group_by(measure) %>%
+  ggplot(aes(x = value)) +
+  geom_histogram() +
+  facet_wrap(~measure, scales = 'free')
+```
+
+Not all data is normalli distributed and all variables have different scaling
+
+Perform data normalization
+
+```{r}
+airquality_norm_long <- airquality_long
+airquality_norm_long$value <- log10(airquality_norm_long$value)
+```
+
+```{r}
+airqual_norm <- airquality_data[, 3:15]
+airqual_norm <- log10(airqual_norm) 
+```
+
+Plot normilized data
+```{r}
+airquality_norm_long %>%
+  group_by(measure) %>%
+  ggplot(aes(x = value)) +
+  geom_histogram() +
+  facet_wrap(~measure, scales = 'free')
+```
+
+Plotting each pair of variables
+```{r}
+pairs(airqual_norm)
+```
+
+Cross-correlation
+```{r}
+corr_kendall <- cor(airquality_data[, 3:15], use = 'complete.obs', method = 'kendall')
+corrplot(corr_kendall)
+```
+
+```{r}
+corr_spearman <- cor(airquality_data[, 3:15], use = 'complete.obs', method = 'spearman')
+corrplot(corr_spearman)
+```
+
+Looks like spearman method detects stronger correlation between benzene and other variables.
+
+Plotting Response of benzene for each predictor
+
+``` {r}
+airqual_norm %>%
+  ggplot(aes(x = CO.GT., y = C6H6.GT.)) +
+  geom_point() +
+  geom_smooth(method = 'lm')
+```
+
+```{r}
+airqual_norm %>%
+  ggplot(aes(x = PT08.S1.CO., y = C6H6.GT.)) +
+  geom_point() +
+  geom_smooth(method = 'lm')
+```
+
+```{r}
+airqual_norm %>%
+  ggplot(aes(x = NMHC.GT., y = C6H6.GT.)) +
+  geom_point() +
+  geom_smooth(method = 'lm')
+```
+
+```{r}
+airqual_norm %>%
+  ggplot(aes(x = PT08.S2.NMHC., y = C6H6.GT.)) +
+  geom_point() +
+  geom_smooth(method = 'lm')
+```
+
+```{r}
+airqual_norm %>%
+  ggplot(aes(x = NOx.GT., y = C6H6.GT.)) +
+  geom_point() +
+  geom_smooth(method = 'lm')
+```
+
+```{r}
+airqual_norm %>%
+  ggplot(aes(x = PT08.S3.NOx., y = C6H6.GT.)) +
+  geom_point() +
+  geom_smooth(method = 'lm')
+```
+
+```{r}
+airqual_norm %>%
+  ggplot(aes(x = NO2.GT., y = C6H6.GT.)) +
+  geom_point() +
+  geom_smooth(method = 'lm')
+```
+
+```{r}
+airqual_norm %>%
+  ggplot(aes(x = PT08.S4.NO2., y = C6H6.GT.)) +
+  geom_point() +
+  geom_smooth(method = 'lm')
+```
+
+```{r}
+airqual_norm %>%
+  ggplot(aes(x = PT08.S5.O3., y = C6H6.GT.)) +
+  geom_point() +
+  geom_smooth(method = 'lm')
+```
+
+```{r}
+set.seed(0)
+```
+
+Creating train/test data
+```{r}
+aq_sample <- sample.int(n = nrow(airqual_norm), size = floor(.75*nrow(airqual_norm)))
+train_air_qual <- airqual_norm[aq_sample, ]
+test_air_qual <- airqual_norm[-aq_sample, ]
+```
+
+Building models
+```{r}
+l_m_CO <- lm(data=train_air_qual, C6H6.GT.~CO.GT.)
+CO_sum <- summary(l_m_CO)
+R_CO <- round(CO_sum$r.squared, 4)
+p_CO <- round(CO_sum$coefficients[2, 4], 4)
+title_CO <- paste('R^2 =', as.character(R_CO), 'p-value =', as.character(p_CO))
+```
+
+```{r}
+l_m_NO <- lm(data=train_air_qual, C6H6.GT.~NOx.GT.)
+NO_sum <- summary(l_m_NO)
+R_NO <- round(NO_sum$r.squared, 4)
+p_NO <- round(NO_sum$coefficients[2, 4], 4)
+title_NO <- paste('R^2 =', as.character(R_NO), 'p-value =', as.character(p_NO))
+```
+
+```{r}
+l_m_NO2 <- lm(data=train_air_qual, C6H6.GT.~NO2.GT.)
+NO2_sum <-summary(l_m_NO2)
+R_NO2 <- round(NO2_sum$r.squared, 4)
+p_NO2 <- round(NO2_sum$coefficients[2, 4], 4)
+title_NO2 <- paste('R^2 =', as.character(R_NO2), 'p-value =', as.character(p_NO2))
+```
+
+Prediction of the test data
+```{r}
+pred_CO <- predict(l_m_CO, newdata = test_air_qual)
+test_air_qual$pred_by_CO <- pred_CO
+
+pred_NO <- predict(l_m_NO, newdata = test_air_qual)
+test_air_qual$pred_by_NO <- pred_NO
+
+pred_NO2 <- predict(l_m_NO2, newdata = test_air_qual)
+test_air_qual$pred_by_NO2 <- pred_NO2
+
+test <- test_air_qual %>%
+  select(C6H6.GT., pred_by_CO, CO.GT., pred_by_NO, NOx.GT., pred_by_NO2, NO2.GT.) %>%
+  drop_na()
+
+head(test)
+```
+
+Building plots
+
+To plot graph with predict and test data I only chose 30 random values. (If plot all predicted values they cover over linear regression line)
+```{r}
+test_for_graph <- test[sample(rownames(test), size = 30), ]
+```
+
+```{r}
+ggplot() +
+  geom_point(data = airqual_norm, aes(x = CO.GT., y = C6H6.GT.)) +
+  geom_smooth(data = airqual_norm, method = 'lm', aes(CO.GT., C6H6.GT.)) +
+  geom_point(data = test_for_graph, aes(x = CO.GT., y = pred_by_CO), color = 'red') +
+  geom_point(data = test_for_graph, aes(x = CO.GT., y = C6H6.GT.), color = 'green') +
+  labs(title = title_CO)
+```
+
+```{r}
+ggplot() +
+  geom_point(data = airqual_norm, aes(x = NOx.GT., y = C6H6.GT.)) +
+  geom_smooth(data = airqual_norm, method = 'lm', aes(NOx.GT., C6H6.GT.)) +
+  geom_point(data = test_for_graph, aes(x = NOx.GT., y = pred_by_NO), color = 'red') +
+  geom_point(data = test_for_graph, aes(x = NOx.GT., y = C6H6.GT.), color = 'green') +
+  labs(title = title_NO)
+```
+
+```{r}
+ggplot() +
+  geom_point(data = airqual_norm, aes(x = NO2.GT., y = C6H6.GT.)) +
+  geom_smooth(data = airqual_norm, method = 'lm', aes(NO2.GT., C6H6.GT.)) +
+  geom_point(data = test_for_graph, aes(x = NO2.GT., y = pred_by_NO2), color = 'red') +
+  geom_point(data = test_for_graph, aes(x = NO2.GT., y = C6H6.GT.), color = 'green') +
+  labs(title = title_NO2)
+```
