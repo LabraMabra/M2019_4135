@@ -1,0 +1,134 @@
+---
+title: "Homework 2.3"
+author: "Valeriia"
+date: "20 05 2020"
+output: pdf_document
+---
+Load all needed libraries.
+```{r message=F, warning=F}
+library(MASS)
+library(data.table)
+library(ggplot2)
+library(caret)
+library(boot)
+library(corrplot)
+data(Boston)
+```
+
+Check our data. It's ok.
+```{r}
+bos <- Boston
+str(bos)
+dim(bos)
+sum(is.na(bos))
+summary(bos)
+sum(duplicated(bos))
+```
+
+Charles River dummy variable (= 1 if tract bounds river; 0 otherwise). Drop it.
+Check correlation. 
+
+```{r}
+bos <- bos[,-4]
+corrplot(cor(bos), method = "number", type = "upper", diag = FALSE)
+```
+
+Cathecorize data.
+
+```{r}
+bos <- data.table(bos)
+bos[,medv_F:= cut(medv,c(0,quantile(bos$medv, 0.33),quantile(bos$medv, 0.66), 
+                         max(bos$medv)),labels=c("1","2","3"))]
+bos[,table(medv_F)]
+```
+
+PCA.
+```{r}
+pca <- prcomp(bos[,-c(13,14)], center = TRUE, scale. = TRUE)
+pca
+dtp <- data.frame('medv_F' = bos$medv_F, pca$x[,1:2])
+ggplot(data = dtp) + 
+       geom_point(aes(x = PC1, y = PC2, col = medv_F)) + 
+       theme_minimal() 
+```
+
+KNN. 
+```{r}
+set.seed(3)
+intrain <- createDataPartition(y = bos$medv_F, p= 0.8, list = FALSE)
+training <- bos[intrain,-13]
+testing <- bos[-intrain,-13]
+# Repeat several times, 10 blocks, 3 times
+trctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 3)
+
+knn_fit <- train(medv_F ~ ., data = training, method = "knn",
+ trControl=trctrl,
+ preProcess = c("center", "scale"),
+ tuneLength = 20)
+knn_fit
+# The hieghest accuracy is in k=7
+plot(knn_fit)
+
+test_pred <- predict(knn_fit, newdata =testing)
+head(data.frame(test_pred, testing$medv_F))
+table(test_pred, Real = testing$medv_F)
+
+knn_fit <- knn3Train(train = training[,-13], test = testing[,-13], k=7, cl = training$medv_F)
+xtab <- table(knn_fit, Real = testing$medv_F)
+xtab
+
+accuracy = sum(knn_fit == testing$medv_F)/length(testing$medv_F)
+precision = xtab[1,1]/sum(xtab[,1])
+recall = xtab[1,1]/sum(xtab[1,])
+f = 2 * (precision * recall) / (precision + recall)
+
+#Accuracy - Accuracy is the most intuitive performance measure and it 
+#is simply a ratio of correctly predicted observation to the total observations. (TP+TN)/(FP+FN+TP+TN)
+
+paste0("Accuracy:", accuracy)
+
+#Precision - Precision is the ratio of correctly predicted 
+#positive observations to the total predicted positive observations. TP/(TP+FP)
+
+paste0("Precision:", precision)
+
+#Recall (Sensitivity) - Recall is the ratio of correctly predicted positive 
+#observations to the all observations in actual class - yes. TP/(TP+FN)
+
+paste0("Recall:", recall)
+
+#F1 Score = 2*(Recall * Precision) / (Recall + Precision)
+
+paste0("F:", f)
+```
+Polynomial regression
+
+```{r warning=F, message=F}
+qplot(lstat, medv, data = Boston, geom = c("point", "smooth"), method = "lm")
+bos[,medv_B:= cut(medv,c(0,median(bos$medv),max(bos$medv)),labels=c("low","high"))]
+bos[,table(medv_B)]
+set.seed(3)
+intrain <- createDataPartition(y = bos$medv_B, p= 0.8, list = FALSE)
+bos1 <- bos[,-c(13,14)]
+training <- bos[intrain,-c(13,14)]
+testing <- bos[-intrain,-c(13,14)]
+#k-fold CV
+errors <- c()
+for (i in 1:5){
+  g <- glm(medv_B ~ poly(lstat,i), family = "binomial", data = bos1)
+  errors[i] <- cv.glm(bos1, g)$delta[1]
+}
+plot(x = 1:5, y = errors, xlab = 'Polynomial degree', ylab = 'Cross-validation')
+
+mod <- glm(medv_B ~ poly(lstat, 5), data = training, family = "binomial")
+summary(mod)
+```
+
+```{r}
+pred <- predict(mod, type = 'response') > 0.5
+table(pred, Real = training$medv_B)
+mod2 <- glm(medv_B ~ lstat, data = testing, family = "binomial")
+summary(mod2)
+pred2 <- predict(mod2, type = 'response', newdata = testing) > 0.5
+table(pred2, Real = testing$medv_B)
+```
