@@ -1,0 +1,551 @@
+---
+title: "HW2.5_Mary_Futey"
+author: "Mary Futey"
+date: "5/19/2020"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r}
+
+library(ggplot2)
+library(MASS)
+library(cluster)
+library(fpc)
+
+
+```
+
+## load data and explore
+
+
+```{r}
+boston <- Boston 
+
+
+```
+
+
+## kmeans
+
+```{r}
+set.seed(4)
+# the result printed is the best result of 20 tries
+# clustering vector: information on each observation (what cluster it is assigned)
+# sum of squares: measure of variance inside the cluster
+km_res <- kmeans(boston, centers = 2, nstart = 20)
+km_res
+
+
+```
+
+
+```{r}
+# withinss: sum of squares within each cluster
+# tot.withins: what we are trying to minimize
+str(km_res)
+
+```
+
+
+```{r}
+# vizualize results of clustering by kmeans 
+plotcluster(boston, km_res$cluster)
+
+```
+
+## try with different cluster sizes
+
+```{r}
+set.seed(4)
+
+# 4 cluster sizes produces good results based on plot and tot.withinss, 
+# but has outliers in 2nd cluster
+km_res3 <- kmeans(boston, 4, nstart = 3)
+km_res3
+
+plotcluster(boston, km_res3$cluster)
+
+
+```
+
+```{r}
+# check res
+str(km_res3)
+
+```
+
+## scree plot
+
+```{r}
+
+# scree plot
+
+tot_w <- rep(0,10)
+
+# perform k means with 1 to 10 clusters
+# total withinss is measure of quality for clustering
+set.seed(8)
+for (k in 1:10) {
+  tot_w[k] <- kmeans(boston, k, nstart = 20)$tot.withinss
+}
+
+# see that 3, maybe 4, is optimal 
+plot(tot_w, type = "b")
+
+
+```
+```{r}
+
+
+boston_F <- boston
+
+# create categorical medv (Median house value) to use as class for pca and hc
+quant_00 = min(boston$medv)
+quant_25 = quantile(boston$medv, 0.25) 
+quant_50 = quantile(boston$medv, 0.50) 
+quant_75 = quantile(boston$medv, 0.75) 
+quant_100 = max(boston$medv)
+
+rb = rbind(quant_00, quant_25, quant_50, quant_75, quant_100) 
+dimnames(rb)[[2]] = "Value"
+
+boston_F$medv_F[boston$medv >= quant_00 &
+                    boston$medv < quant_25] = "FirstQ"
+boston_F$medv_F[boston$medv >= quant_25 &
+                    boston$medv < quant_50] = "SecondQ"
+boston_F$medv_F[boston$medv >= quant_50 & 
+                    boston$medv <= quant_75] = "ThirdQ"
+boston_F$medv_F[boston$medv >= quant_75 &
+                    boston$medv <= quant_100] = "FourthQ"
+boston_F$medv_F = factor(boston_F$medv_F,
+levels=c("FirstQ", "SecondQ", "ThirdQ", "FourthQ"))
+
+# remove median house value from boston housing dataset
+boston_pca <- subset(boston, select = -medv) 
+```
+
+
+
+## hierarchical clustering
+
+```{r}
+
+
+distance <- dist(boston)
+
+# takes max distance
+hc_comp <- hclust(distance, method = "complete")
+# takes average distance
+hc_avg <- hclust(distance, method = "average")
+# minimal distance
+hc_sing <- hclust(distance, method = "single")
+
+```
+
+
+
+## hc dendrograms 
+
+```{r}
+# organzine plotting window with 3 cells aligned as columns
+par(mfrow = c(1, 3))
+
+# complete and average look similar 
+plot(hc_comp, hang = -1, labels = boston_F$medv_F)
+plot(hc_avg, hang = -1, labels = boston_F$medv_F)
+plot(hc_sing, hang = -1, labels = boston_F$medv_F)
+
+# reset plotting window
+par(mfrow = c(1, 1))
+
+```
+
+
+
+
+```{r}
+par(mfrow = c(1, 3))
+
+# create hc object with complete and decide how many clusters to choose
+hc <- hclust(distance, method = "complete")
+
+# create 3 plots with different number of clusters outlined
+
+# division by 2 or 3 clusters looks best
+plot(hc, hang = -1, labels = NULL)
+rect.hclust(hc, k = 2)
+
+plot(hc, hang = -1, labels = NULL)
+rect.hclust(hc, k = 3)
+
+# after 4 clusters begin to have v. small clusters
+plot(hc, hang = -1, labels = NULL)
+rect.hclust(hc, k = 5)
+
+par(mfrow = c(1, 1))
+```
+
+
+
+
+## PCA 
+
+
+```{r}
+
+# check column means
+colMeans(boston)
+
+```
+
+
+
+
+```{r}
+
+# check sd
+apply(boston, 2, sd)
+
+```
+
+
+
+
+```{r}
+
+
+
+# perform PCA with scaled data based on the above checks 
+pca <- prcomp(x = boston_pca, center = TRUE, scale = TRUE)
+pca
+
+```
+
+
+
+```{r}
+# first 4 components explain ~75% of variance
+summary(pca)
+
+```
+
+
+```{r}
+
+# chas is co-directed with PC1
+biplot(pca)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+
+# data frame with MedVal
+pca_adj <- data.frame(pca$x, MedVal = boston_F$medv_F)
+
+
+```
+
+
+
+
+
+
+
+
+```{r}
+
+
+# check clustering based on MedVal PC1 and PC2
+p1 <- ggplot(data = pca_adj,
+       aes(x = PC1,
+       y = PC2,
+       color = MedVal)) +
+  geom_point() +
+  labs(x = "PC1 (47% variance)") +
+  labs(y = "PC2 (11% variance)" )
+
+p1
+
+```
+
+
+
+
+
+```{r}
+# reduce to one dimension
+p2 <- ggplot(data = pca_adj, 
+       aes(x = PC1,
+           fill = MedVal)) + 
+  geom_histogram(alpha = 0.6,
+                 color = "black",
+                 bins = 25,
+                 position = "identity") +
+  labs(x = "PC1 (47% variance)") 
+
+p2
+
+```
+
+
+```{r}
+
+
+# check clustering based on MedVal fpr PC1 and PC3
+p3 <- ggplot(data = pca_adj,
+       aes(x = PC1,
+       y = PC3,
+       color = MedVal)) +
+  geom_point() +
+  labs(x = "PC1 (47% variance)") +
+  labs(y = "PC3 (9% variance)" )
+
+p3
+
+```
+
+
+
+```{r}
+# get variance: indicator if interesting / informative or not
+pca_var <- pca$sdev^2 
+pca_var
+
+```
+
+
+```{r}
+# pve: proportion of variance explained 
+pca_pve <- pca_var / sum(pca_var)
+# how informaitve each PC is (highest to low)
+pca_pve
+
+```
+
+
+```{r}
+ # cummlative: helpful in deciding how many PC to take: cutoff 80% (5 PCs)
+cumsum(pca_pve)
+
+```
+
+
+
+```{r}
+
+par(mfrow = c(1, 2))
+#proportion of variance
+pve <- summary(pca)$importance[2,] 
+
+#cummulative variance 
+cpve <- summary(pca)$importance[3,]
+
+
+plot(pve, type = "b", main = "Proportion of Var. Explained")
+
+# 5 features explain 80%
+plot(cpve, type = "b", main = "Cumulative Prop. of Var. Explained")
+abline(h = 0.8, col = "red")
+par(mfrow = c(1, 1))
+
+
+```
+
+
+
+```{r}
+
+plot(pca)
+
+```
+
+
+
+```{r}
+par(mfrow = c(1, 3))
+
+# based on above, decided to use first 5 PCs 
+# clustering visually looks better than initial 
+
+pca_tune <- pca_adj[, 1:5]
+dist <- dist(pca_tune)
+
+# complete looks best, single terrible
+plot(hclust(dist, method = "complete"), hang = -1, labels = pca_adj$MedVal)
+plot(hclust(dist, method = "average"), hang = -1, labels = pca_adj$MedVal)
+plot(hclust(dist, method = "single"), hang = -1, labels = pca_adj$MedVal)
+
+par(mfrow = c(1, 1))
+```
+
+
+```{r}
+
+# use complete method 
+hc_tune <- hclust(dist, method = "complete")
+
+# division by two clusters
+plot(hc_tune, hang = -1, labels = pca_adj$MedVal) 
+rect.hclust(hc_tune, k = 2)
+
+```
+
+
+```{r}
+
+
+plot(hc_tune, hang = -1, labels = pca_adj$MedVal) 
+rect.hclust(hc_tune, k = 5)
+
+```
+
+
+```{r}
+# check intersection of clusters (k = 2-5) and 
+# compare with original hc without tuning: improved
+table(pca_adj$MedVal, cutree(hc_tune, 2))
+
+table(pca_adj$MedVal, cutree(hc, 2))
+
+```
+
+
+
+```{r}
+
+table(pca_adj$MedVal, cutree(hc_tune, 3))
+
+table(pca_adj$MedVal, cutree(hc, 3))
+
+```
+
+
+
+```{r}
+
+table(pca_adj$MedVal, cutree(hc_tune, 4))
+table(pca_adj$MedVal, cutree(hc, 4))
+```
+
+
+
+
+
+
+```{r}
+
+# difficult to make a call as they are not cleanly clustered, 
+# but 4 looks best to me (above)
+table(pca_adj$MedVal, cutree(hc_tune, 5))
+table(pca_adj$MedVal, cutree(hc, 5))
+
+```
+
+
+
+
+```{r}
+
+
+# graphical analysis of pca data with clustering with 5 priniciple components
+# create data frame with first 2 PCs
+data_pca_clust <- data.frame(pca$x[, 1:2], # use 2 PCs even tho use 5 for clustering
+                             # create factored columns with cluster assignment with 5 PCs
+                             k2 = factor(cutree(hc_tune, 2)), 
+                             k3 = factor(cutree(hc_tune, 3)), 
+                             k4 = factor(cutree(hc_tune, 4)), 
+                             k5 = factor(cutree(hc_tune, 5)), 
+                             label = pca_adj$MedVal)
+
+# plot k = 2
+p4 <- ggplot(data_pca_clust, 
+       aes(x = PC1, 
+           y = PC2, 
+           color = k2, 
+           label = pca_adj$MedVal)) + 
+  geom_point() + 
+  geom_label() + 
+  theme_bw()
+p4
+
+```
+
+
+
+
+```{r}
+# plot k = 3
+p5 <- ggplot(data_pca_clust, 
+       aes(x = PC1, 
+           y = PC2, 
+           color = k3, 
+           label = pca_adj$MedVal)) + 
+  geom_point() + 
+  geom_label() + 
+  theme_bw()
+
+p5
+```
+
+
+```{r}
+# plot k = 4
+p6 <- ggplot(data_pca_clust, 
+       aes(x = PC1, 
+           y = PC2, 
+           color = k4, 
+           label = pca_adj$MedVal)) + 
+  geom_point() + 
+  geom_label() + 
+  theme_bw()
+
+p6
+```
+
+
+
+```{r}
+# plot k = 5
+p7 <- ggplot(data_pca_clust, 
+       aes(x = PC1, 
+           y = PC2, 
+           color = k5, 
+           label = pca_adj$MedVal)) + 
+  geom_point() + 
+  geom_label() + 
+  theme_bw()
+
+p7
+```
+
+
+
+
+
+
+
+
+
+
+
