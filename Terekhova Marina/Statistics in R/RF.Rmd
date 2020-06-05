@@ -1,0 +1,82 @@
+---
+title: "RF"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(mlbench)
+data(Glass)
+library(randomForest)
+library(MASS)
+library(caret)
+```
+
+```{r}
+Glass$Type2 <- as.factor(c(rep('Window', 163), rep('Non-Window', 51)))
+set.seed(42)
+train <- createDataPartition(Glass$Type2, p=0.75, list = FALSE)
+```
+
+
+```{r}
+# sample size
+ceiling(.632*nrow(Glass[-train,]))
+# number of vars at each split
+floor(sqrt(ncol(Glass)))
+```
+
+
+```{r}
+set.seed(42)
+rf_class <- randomForest(Type2 ~ ., data = Glass,
+                         subset = train,
+                         mtry = 3,
+                         sampsize = 33,
+                         importance = T)
+rf_class
+```
+```{r}
+# test
+est_medv <- predict(rf_class, newdata = Glass[-train,])
+mean(est_medv != Glass$Type2[-train])
+```
+```{r}
+set.seed(42)
+ntrees <- 500
+rf_class <- randomForest(Type2 ~ ., data = Glass,
+                         subset = train,
+                         ntree = ntrees,
+                         mtry = 3,
+                         sampsize = 33,
+                         importance = T,
+                         do.trace = ntrees/10)
+rf_class
+```
+
+
+```{r}
+varImpPlot(rf_class)
+```
+
+
+
+```{r}
+set.seed(42)
+ntrees <- 100
+rf_class <- randomForest(Type2 ~ ., data = Glass,
+                         subset = train,
+                         ntree = ntrees,
+                         mtry = 3,
+                         sampsize = 33,
+                         importance = T,
+                         do.trace = ntrees/10)
+rf_class
+```
+
+
+
+
