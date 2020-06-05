@@ -1,0 +1,220 @@
+---
+title: "Hw2_3"
+author: "Grigoreva Elizaveta"
+date: "6/3/2020"
+output:
+  html_document:
+    df_print: paged
+---
+```{r, warning=FALSE}
+library(mlbench)
+library(ggplot2)
+library(dplyr)
+library(caret)
+library(boot)
+library(tree)
+library(class)
+library(corrplot)
+library(ggfortify)
+library(RColorBrewer)
+library(data.table)
+```
+
+
+Load data, check NA, duplicates
+```{r, warning=FALSE}
+data("BostonHousing")
+boston <-  BostonHousing
+str(boston)
+summary(boston)
+```
+
+```{r, warning=FALSE}
+summary(is.na(boston))
+summary(duplicated(boston))
+```
+
+Create subset w/o Charles River dummy variable and paerform correlation plot
+```{r, warning=FALSE}
+summary(is.na(boston))
+summary(duplicated(boston))
+```
+```{r}
+boston_sub<-  boston[,-4]
+corrplot(cor(boston_sub), method="number", type="upper", diag=F)
+```
+Plot each feature against crim rate
+```{r}
+bosmelt <- melt(boston, id="crim")
+ggplot(bosmelt, aes(x=value, y=crim))+
+  facet_wrap(~variable, scales="free")+
+  geom_point()
+```
+```{r}
+summary(boston$crim)
+```
+Create categorical variable
+```{r}
+quant_00  = min(boston_sub$medv)
+quant_25  = quantile(boston_sub$medv, 0.25)
+quant_50  = quantile(boston_sub$medv, 0.50)
+quant_75  = quantile(boston_sub$medv, 0.75)
+quant_100 = max(boston_sub$medv)
+rb = rbind(quant_00, quant_25, quant_50, quant_75, quant_100)
+dimnames(rb)[[2]] = "Value"
+boston_sub$medv_F[boston$medv >= quant_00 & boston_sub$medv < quant_25]  = "1q"
+boston_sub$medv_F[boston$medv >= quant_25 & boston_sub$medv <  quant_50]  = "2q"
+boston_sub$medv_F[boston$medv >= quant_50 & boston_sub$medv <= quant_75] = "3q"
+boston_sub$medv_F[boston$medv >= quant_75 &  boston_sub$medv <= quant_100] = "4q"
+boston_sub$medv_F = factor(boston_sub$medv_F,levels=c("1q", "2q", "3q", "4q"))
+
+# Remove numerical medv
+
+boston_df <- boston_sub[,-13]
+str(boston_df)
+```
+PCA
+```{r, warning=FALSE}
+
+boston_pca <- boston_df[, -13]
+pca <- prcomp(boston_pca, center = TRUE,
+              scale. = TRUE) 
+autoplot(pca, data = boston_df, colour = "medv_F") 
+
+
+```
+KNN
+```{r}
+set.seed(42)
+boston_pca <- boston_df[, -13]
+knn <- train(medv_F ~ ., 
+               data = boston_df, 
+               method = "knn",
+  trControl = trainControl("cv", number = 3),
+  preProcess = c("center","scale"),
+  tuneLength = 50,
+  metric = "Accuracy"
+  )
+knn
+# plot knn model 
+plot(knn)
+```
+```{r}
+# best tuning parameter for k that minimizes MSE
+print(paste0("best k to minimize MSE: ", knn$bestTune))
+
+```
+
+Test this model
+```{r}
+set.seed(33)
+# create test set,k=5
+test <- sample(nrow(boston_df), 0.8*nrow(boston_df)) 
+# test model with predicted k 
+knn_test <- knn(train = boston_df[-test, -13, drop = F],
+                test = boston_df[test, -13, drop = F],
+                cl = boston_df[-test, "medv_F"],
+                k = 5)
+# check the accuracy
+table(knn_test, Real = boston_df[test, "medv_F"])
+```
+Accuracy of the model
+```{r}
+(73+27+48+53)/405 
+```
+
+
+Logistic regression
+```{r}
+#Calculate mean
+mean(boston$medv)
+```
+
+```{r}
+#Create binomial variable and separate to the hight and low level of criminal based on median
+cv.err <- 1:5
+boston_bi <- boston_sub %>% mutate(medv_bi = ifelse(medv >= 22.5, "high", "low")) %>% 
+  mutate(medv_bi = factor(medv_bi, levels = c("high", "low")))
+boston_bi <- boston_bi[,-c(13:14)]
+
+for (i in 1:5){
+  gl <- glm(medv_bi ~ poly(rm, i), family = "binomial",
+            data = boston_bi)
+  cv.err[i] <- cv.glm(boston_bi, gl)$delta[1]
+}
+cv.err
+plot(x = 1:5, y = cv.err,
+     xlab = 'Polynomial degree', ylab='Cross-validation')
+```
+```{r}
+# on each iteration, create the model for the given power and est MSE
+for (i in 1:5){
+  gl <- glm(medv_bi ~ poly(rm, i), family = "binomial",
+            data = boston_bi)
+  cv.err[i] <- cv.glm(boston_bi, gl)$delta[1]
+}
+cv.err
+plot(x = 1:5, y = cv.err,
+     xlab = 'Polynomial degree', ylab='Cross-validation')
+```
+```{r}
+# use 3rd degree
+glm <- glm(medv_bi ~ poly(rm, 3), data = boston_bi, family = "binomial")
+summary(glm)
+pred_glm <- predict(glm, type = "response") > 0.5
+table(pred_glm, Real = boston_bi[, 13])
+```
+```{r}
+
+boston_df <- boston_sub[,-13]
+
+test <- sample(nrow(boston_df), 0.8*nrow(boston_df)) 
+
+glm2  <- glm(medv_bi ~ rm, data = boston_bi[-test, ],
+             family = "binomial")
+```
+#Summary 
+```{r}
+summary(glm2)
+```
+```{r}
+pred_glm2 <- predict(glm2, type = "response", newdata = boston_bi[test, ]) > 0.5
+table(pred_glm2, Real = boston_bi[test, 13])
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
