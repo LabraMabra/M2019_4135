@@ -1,0 +1,162 @@
+---
+title: "hw4"
+author: "Valeriia"
+date: "27 05 2020"
+output: pdf_document
+---
+
+```{r message=FALSE, warning=FALSE}
+library(MASS)
+library(dplyr)
+library(data.table)
+library(ggplot2)
+library(caret)
+library(boot)
+library(tree)
+library(rpart)
+library(randomForest)
+library(gbm)
+data(Boston)
+```
+
+
+
+```{r}
+bos <- Boston
+str(bos)
+dim(bos)
+sum(is.na(bos))
+summary(bos)
+sum(duplicated(bos))
+```
+
+This plot shows the Error and the Number of Trees. We can easily notice that how the Error is dropping as we keep on adding more and more trees and average them.
+
+Although the most complex tree is selected by cross-validation (the lowest error rate corresponds to the most complex tree with 8 leaves), if we wanted to prune the tree, we would do it as follows, using the prune.tree() function.
+
+```{r}
+train <- sample(nrow(bos), 0.5*nrow(bos), replace = FALSE)
+TrainSet <- bos[train,]
+ValidSet <- bos[-train,]
+tree.boston = tree(medv~.,Boston ,subset =train,mindev=.0001)
+plot(tree.boston,type="u")
+text(tree.boston,pretty=0,cex=0.3)
+cv.boston = cv.tree(tree.boston)
+plot(cv.boston$size,cv.boston$dev,type="b")
+prune.boston = prune.tree(tree.boston,best=6)
+plot(prune.boston,type="u")
+text(prune.boston,pretty=0)
+```
+
+```{r}
+mod <- randomForest(medv ~ ., data = TrainSet, mtry = 13, importance = T)
+plot(mod)
+mod
+est_rm <- predict(mod, newdata = ValidSet)
+plot(est_rm, ValidSet$medv)
+abline(0,1)
+mean((est_rm - ValidSet$medv)^2)
+```
+The above Random Forest model chose Randomly 4 variables to be considered at each split. We could now try all possible 13 predictors which can be found at each split.
+Now what we observe is that the Red line is the Out of Bag Error Estimates and the Blue Line is the Error calculated on Test Set. Both curves are quite smooth and the error estimates are somewhat correlated too. 
+```{r}
+oob.err<-double(13)
+test.err<-double(13)
+
+#mtry is no of Variables randomly chosen at each split
+for(mtry in 1:13) 
+{
+  rf=randomForest(medv ~ . , data = TrainSet,mtry=mtry,ntree=400) 
+  oob.err[mtry] = rf$mse[400] #Error of all Trees fitted
+  
+  pred<-predict(rf,ValidSet) #Predictions on Test Set for each Tree
+  test.err[mtry]= with(ValidSet, mean( (medv - pred)^2)) #Mean Squared Test Error
+  
+  cat(mtry," ")
+  
+}
+
+matplot(1:mtry , cbind(oob.err,test.err), pch=19 , col=c("red","blue"),type="b",ylab="Mean Squared Error",xlab="Number of Predictors Considered at each Split")
+legend("topright",legend=c("Out of Bag Error","Test Error"),pch=19, col=c("red","blue"))
+```
+Next, we pass it to the function plot_min_depth_distribution and under default settings obtain obtain a plot of the distribution of minimal depth for top ten variables according to mean minimal depth calculated using top trees (mean_sample = "top_trees"). We could also pass our forest directly to the plotting function but if we want to make more than one plot of the minimal depth distribution is more efficient to pass the min_depth_frame to the plotting function so that it will not be calculated again for each plot (this works similarly for other plotting functions of randomForestExplainer).
+
+```{r}
+library(randomForestExplainer)
+min_depth_frame <- min_depth_distribution(mod)
+plot_min_depth_distribution(min_depth_frame, mean_sample = "relevant_trees", k = 15)
+```
+
+```{r}
+set.seed(3)
+bag.boston=randomForest(medv~.,data=TrainSet,mtry=7, importance=TRUE)
+yhat.bag = predict(bag.boston,newdata=ValidSet)
+mean((yhat.bag-ValidSet$medv)^2)
+importance(bag.boston)
+varImpPlot(bag.boston)
+```
+
+
+```{r warning=FALSE}
+set.seed(1)
+boost.boston=gbm(medv~.,data=TrainSet,distribution="gaussian",n.trees=5000,interaction.depth=4)
+summary(boost.boston)
+boost.boston=gbm(medv~.,data=TrainSet,distribution="gaussian",n.trees=5000,interaction.depth=4,shrinkage=0.02,verbose=F)
+yhat.boost=predict(boost.boston,newdata=ValidSet,n.trees=5000)
+mean((yhat.boost-ValidSet$medv)^2)
+
+n.trees = seq(from=100 ,to=10000, by=100) #no of trees-a vector of 100 values 
+
+#Generating a Prediction matrix for each Tree
+predmatrix<-predict(boost.boston,Boston[-train,],n.trees = n.trees)
+dim(predmatrix) #dimentions of the Prediction Matrix
+
+#Calculating The Mean squared Test Error
+test.error<-with(Boston[-train,],apply( (predmatrix-medv)^2,2,mean))
+head(test.error) #contains the Mean squared test error for each of the 100 trees averaged
+
+#Plotting the test error vs number of trees
+
+plot(n.trees , test.error , pch=19,col="blue",xlab="Number of Trees",ylab="Test Error", main = "Perfomance of Boosting on Test Set")
+
+#adding the RandomForests Minimum Error line trained on same data and similar parameters
+abline(h = min(test.err),col="red") #test.err is the test error of a Random forest fitted on same data
+legend("topright",c("Minimum Test error Line for Random Forests"),col="red",lty=1,lwd=1)
+
+boost.boston=gbm(medv~.,data=TrainSet,distribution="gaussian",n.trees=1000,interaction.depth=4,shrinkage=0.02,verbose=F)
+yhat.boost=predict(boost.boston,newdata=ValidSet,n.trees=1000)
+mean((yhat.boost-ValidSet$medv)^2)
+```
+
+```{r}
+hist(bos$medv, breaks = 50)
+bos <- data.table(bos)
+bos[,medv_F:= cut(medv,c(0,quantile(bos$medv, 0.33),quantile(bos$medv, 0.66), 
+                         max(bos$medv)),labels=c("1","2","3"))]
+bos %>%
+  ggplot(aes(medv, color = medv_F))+
+  geom_histogram(fill="white", alpha=0.5)
+bos <- bos[,-14]
+sampsize <-  ceiling(0.6325*nrow(bos[-train]))
+mtry <- floor(sqrt(ncol(bos)))
+set.seed(3)
+ntrees <- 50
+rf <- randomForest(medv_F ~ ., data=bos,
+                   subset = train,
+                   ntree = ntrees,
+                   mtry = mtry,
+                   sampsize = sampsize,
+                   importance = TRUE,
+                   do.trace = ntrees/25)
+set.seed(3)
+rf <- randomForest(medv_F ~ ., data=bos,
+                   subset = train,
+                   ntree = 30,
+                   mtry = mtry,
+                   sampsize = sampsize,
+                   importance = TRUE)
+rf
+pred <- predict(rf, newdata = bos[-train,])
+mean(pred!=bos$medv_F[-train])
+varImpPlot(rf)
+```
