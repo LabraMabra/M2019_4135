@@ -63,7 +63,7 @@ varImpPlot(rf_class)
 
 ```{r}
 set.seed(42)
-ntrees <- 100
+ntrees <- 150
 rf_class <- randomForest(Type ~ ., data = Glass,
                          subset = train,
                          ntree = ntrees,
@@ -73,8 +73,10 @@ rf_class <- randomForest(Type ~ ., data = Glass,
                          do.trace = ntrees/25)
 rf_class
 ```
+
 ```{r}
 # test
 est_medv <- predict(rf_class, newdata = Glass[-train,])
 mean(est_medv != Glass$Type[-train])
 ```
+
