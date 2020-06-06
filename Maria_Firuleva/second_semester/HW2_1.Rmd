@@ -1,0 +1,256 @@
+---
+title: "HW2_1"
+author: "Maria Firulyova"
+output: html_document
+---
+
+```{r, echo=F}
+knitr::opts_chunk$set(fig.width=12, fig.height=8, warning = F, message = F) 
+```
+
+```{r, warning=F, message=F}
+library(data.table)
+library(dplyr)
+library(magrittr)
+library(ggplot2)
+library(tidyr)
+library(plyr)
+```
+
+## 1
+
+Import data, transform it to the long format
+
+```{r transform}
+set.seed(1)
+df <- get(data("anscombe"))
+df <- data.frame(
+  group  = rep(1:4, each = 11),
+  x = unlist(df[,c(1:4)]),
+  y = unlist(df[,c(5:8)])
+)
+rownames(df) <- NULL
+knitr::kable(head(df))
+```
+
+Plots
+
+```{r}
+ggplot(data = df, aes(x = x, y = y))+
+  geom_point()+
+  facet_wrap(~ group)+
+  theme_bw()
+```
+
+
+Summary (mean, sd)
+```{r}
+knitr::kable(
+  df %>% group_by(group) %>%
+  summarise_each(list(mean = mean, sd = sd))
+)
+```
+
+
+Check whether both *x* and *y* values are normal distributed or not, perform both Pearson and Spearman correlations.
+
+```{r}
+cor_estimate <- function(data)
+{
+  apply(data.frame(SHAPIRO_X_P_VALUE = shapiro.test(data$x)$p.value,
+             SHAPIRO_Y_P_VALUE = shapiro.test(data$y)$p.value,
+             PEARSON = cor(data$x, data$y, method = "pearson"),
+             PEARSON_P_VALUE = cor.test(data$x, data$y)$p.value,
+             SPEARMAN = cor(data$x, data$y, method = "spearman"),
+             SPEARMAN_P_VALUE = cor.test(data$x, data$y)$p.value), 2, function(x) round(x, 3))
+}
+
+knitr::kable(ddply(df, .(group), cor_estimate))
+```
+
+
+```{r}
+ggplot(data = df, aes(x = x, y = y))+
+  geom_point()+
+  geom_smooth(method = 'lm')+
+  facet_wrap(~ group)+
+  theme_bw()
+```
+
+## 2
+
+Import data, check *NA* percentage in each column, transform Date from character to factor.
+
+```{r}
+set.seed(1)
+air_q <- fread('~/Загрузки/AirQualityUCI.csv', dec=',') %>% select(-c('V16', 'V17'))
+air_q <- air_q %>%
+  mutate(Date = as.factor(Date)) %>% 
+  mutate(Time = as.factor(Time))
+knitr::kable(apply(air_q, 2, function(x) round(sum(is.na(x)) / length(x), 2)) %>%
+               as.data.frame() %>% magrittr::set_colnames('na_percentage'))
+```
+
+Since there are not so many *NA* in each column, I can drop it.
+
+```{r, message=F, warning=F}
+air_q <- air_q %>% drop_na()
+air_q_long <- air_q %>% melt()
+```
+Distribution of numeric variables:
+
+```{r, warning=F, message=F}
+ggplot(air_q_long, aes(x = value))+
+  geom_histogram(col = 'black', fill='white')+
+  theme_bw()+
+  facet_wrap(~variable, scales = 'free')
+```
+
+Since there are some negative values (e.g., see *GO(GT)*), I'll replace it to *NA*.
+
+```{r}
+air_q <- sapply(select_if(air_q, is.numeric),
+                function(x) ifelse (x < 0, NA, x)) %>%
+  as.data.frame() %>% 
+  drop_na()
+
+air_q_long <- air_q %>% melt()
+ggplot(air_q_long, aes(x = value))+
+  geom_histogram(col = 'black', fill='white')+
+  theme_bw()+
+  facet_wrap(~variable, scales = 'free')
+```
+
+```{r}
+ggplot(air_q_long, aes(x = value))+
+  geom_boxplot(col = 'black', fill='white')+
+  theme_bw()+
+  facet_wrap(~variable, scales = 'free')
+```
+
+Let's check the normality of each numeric variable using Shapiro test. p-values are:
+
+```{r}
+knitr::kable(apply(air_q, 2, function(x) shapiro.test(x)$p.value))
+```
+
+There is only one normally distributed variable: *NO2(GT)*.
+
+Let's investigate correlation matris using Spearman criterion
+```{r}
+get_upper_tri <- function(cormat){
+  cormat[lower.tri(cormat)]<- NA
+  cormat
+}
+
+reorder_cormat <- function(cormat){
+  dd <- as.dist((1-cormat)/2)
+  hc <- hclust(dd)
+  cormat <-cormat[hc$order, hc$order]
+}
+
+cor_mat <- cor(air_q, use = "complete.obs", method = "spearman")
+cor_mat <- reorder_cormat(cor_mat)
+upper_tri <- get_upper_tri(cor_mat)
+melted_cormat <- melt(upper_tri, na.rm = TRUE) %>% mutate(value = round(value, 3))
+ggheatmap <- ggplot(melted_cormat, aes(Var2, Var1, fill = value))+
+  geom_tile(color = "white")+
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
+                       midpoint = 0, limit = c(-1,1), space = "Lab", 
+                       name="Spearman\nCorrelation") +
+  theme_minimal()+
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, 
+                                   size = 12, hjust = 1))+
+  coord_fixed()
+ggheatmap+
+  geom_text(aes(Var2, Var1, label = value), color = "black", size = 4) +
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.border = element_blank(),
+    panel.background = element_blank(),
+    axis.ticks = element_blank(),
+    legend.justification = c(1, 0),
+    legend.position = c(0.6, 0.7),
+    legend.direction = "horizontal")+
+  guides(fill = guide_colorbar(barwidth = 7, barheight = 1,
+                               title.position = "top", title.hjust = 0.5))
+
+```
+
+Let's build some regression models:
+
+Positive correlation:
+
+```{r}
+ggplot(air_q, aes(x = `C6H6(GT)`, y = `PT08.S4(NO2)`))+
+  geom_point()+
+  geom_smooth(method = lm)+
+  theme_bw()
+```
+
+Negative correlation:
+
+```{r}
+ggplot(air_q, aes(x = `RH`, y = `T`))+
+    geom_point()+
+    geom_smooth(method = lm)+
+    theme_bw()
+```
+
+Let's investigate *R* and *T* dependency
+
+```{r}
+set.seed(1)
+fit1 <- lm(RH ~ T, air_q)
+summary(fit1)
+```
+
+What if we transform our variables?
+
+```{r}
+set.seed(1)
+fit2 <- lm(log10(RH) ~ log10(T), air_q)
+summary(fit2)
+```
+
+Both models gives significant p-values, however the transformed model has greater adjusted R-squared. If our aim is to use model for prediction purposes, the second one is better than the first one.
+
+```{r}
+vals <- cbind(fit2$residuals, fit2$fitted.values) %>% as.data.frame() %>% magrittr::set_colnames(c('residuals', 'fitted'))
+knitr::kable(apply(vals, 2, function(x) shapiro.test(x)$p.value))
+```
+
+
+P-values tell us that residuals are not normally distributed, even the histogram looks like normal. Probably, we should bootstrapped our values to give better coeffecients
+
+```{r}
+ggplot(vals, aes(x = residuals))+
+  geom_histogram(col = 'black', fill='white')+
+  theme_bw()+
+  ggtitle('residuals distribution')
+
+```
+
+
+```{r}
+ggplot(vals, aes(x = residuals, y = fitted))+
+  geom_point()+
+  theme_bw()+
+  ggtitle('lm(log10(RH) ~ log10(T), air_q)')
+```
+
+My bootstrap function for slope estimation (output = CI 95%):
+```{r}
+set.seed(1)
+slope_cl_boot <- function(df) {
+  slope <- lm(formula = y ~ x, df)$coefficients[2]
+  lm_repl <- replicate(1e3, dplyr::sample_n(df, nrow(df), replace = T), simplify=FALSE)
+  lm_repl <- lapply(lm_repl, function(data) lm(formula = y ~ x, data))
+  res <- slope - sapply(lm_repl, function(x) x[[1]][2])
+  rbind(c(res[50] + slope, res[950] + slope)) %>% as.data.frame() %>% 
+    magrittr::set_colnames(c('slope_5', 'slope_95'))
+}
+knitr::kable(slope_cl_boot(air_q %>% select(RH, T) %>% magrittr::set_colnames(c('x', 'y'))))
+```
