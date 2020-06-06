@@ -2,7 +2,9 @@
 title: "Homework 2.3"
 author: "Valeriia"
 date: "20 05 2020"
-output: pdf_document
+output:
+  html_document:
+    df_print: paged
 ---
 Load all needed libraries.
 ```{r message=F, warning=F}
@@ -29,8 +31,9 @@ Charles River dummy variable (= 1 if tract bounds river; 0 otherwise). Drop it.
 Check correlation. 
 
 ```{r}
-bos <- bos[,-4]
-corrplot(cor(bos), method = "number", type = "upper", diag = FALSE)
+corrplot(cor(bos, method = "spearman"), method = "number", type = "upper", diag = FALSE)
+p.mat <- cor.mtest(bos)$p
+corrplot(cor(bos, method = "spearman"), p.mat = p.mat, insig = "p-value", sig.level = -1)
 ```
 
 Cathecorize data.
@@ -44,12 +47,20 @@ bos[,table(medv_F)]
 
 PCA.
 ```{r}
-pca <- prcomp(bos[,-c(13,14)], center = TRUE, scale. = TRUE)
-pca
+library(pca3d)
+pca <- prcomp(bos[,-c(13,14, 15)], center = TRUE, scale. = TRUE)
+
+pca3d(pca, group=bos$medv_F)
+
+dfdf = stats:::summary.prcomp(pca)$importance[2, ]
+
 dtp <- data.frame('medv_F' = bos$medv_F, pca$x[,1:2])
+
+
 ggplot(data = dtp) + 
-       geom_point(aes(x = PC1, y = PC2, col = medv_F)) + 
-       theme_minimal() 
+       geom_point(aes(x = PC1, y = PC2, col = medv_F))+
+  xlab(paste0("PC1 ", dfdf[1]*100))+
+  ylab(paste0("PC2 ", dfdf[2]*100))
 ```
 
 KNN. 
@@ -63,8 +74,8 @@ trctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 3)
 
 knn_fit <- train(medv_F ~ ., data = training, method = "knn",
  trControl=trctrl,
- preProcess = c("center", "scale"),
- tuneLength = 20)
+ preProcess = c("center", "scale"), #normalisation
+ tuneLength = 20) #K number
 knn_fit
 # The hieghest accuracy is in k=7
 plot(knn_fit)
@@ -104,14 +115,14 @@ paste0("F:", f)
 Polynomial regression
 
 ```{r warning=F, message=F}
-qplot(lstat, medv, data = Boston, geom = c("point", "smooth"), method = "lm")
+ggplot(Boston,aes(lstat,medv))+geom_point()+geom_smooth()
 bos[,medv_B:= cut(medv,c(0,median(bos$medv),max(bos$medv)),labels=c("low","high"))]
 bos[,table(medv_B)]
 set.seed(3)
-intrain <- createDataPartition(y = bos$medv_B, p= 0.8, list = FALSE)
-bos1 <- bos[,-c(13,14)]
-training <- bos[intrain,-c(13,14)]
-testing <- bos[-intrain,-c(13,14)]
+bos1 <- bos[,-c(14,15)]
+intrain <- createDataPartition(y = bos1$medv_B, p= 0.8, list = FALSE)
+training <- bos[intrain,]
+testing <- bos[-intrain,]
 #k-fold CV
 errors <- c()
 for (i in 1:5){
@@ -120,15 +131,17 @@ for (i in 1:5){
 }
 plot(x = 1:5, y = errors, xlab = 'Polynomial degree', ylab = 'Cross-validation')
 
-mod <- glm(medv_B ~ poly(lstat, 5), data = training, family = "binomial")
+mod <- glm(medv_B ~ poly(lstat, 2), data = bos1, family = "binomial")
 summary(mod)
 ```
 
 ```{r}
 pred <- predict(mod, type = 'response') > 0.5
-table(pred, Real = training$medv_B)
+table(pred, Real = bos1$medv_B)
+paste0("Accuracy:",sum(knn_fit == bos1$medv_B)/length(bos1$medv_B))
 mod2 <- glm(medv_B ~ lstat, data = testing, family = "binomial")
 summary(mod2)
 pred2 <- predict(mod2, type = 'response', newdata = testing) > 0.5
 table(pred2, Real = testing$medv_B)
+paste0("Accuracy:",sum(knn_fit == testing$medv_B)/length(testing$medv_B))
 ```
