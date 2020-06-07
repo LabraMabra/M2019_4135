@@ -2,7 +2,7 @@
 title: "Task 21"
 author: "Lisa Skalon"
 date: "4/9/2020"
-output: word_document
+output: html_document
 ---
 
 ```{r setup, include=FALSE}
@@ -53,7 +53,13 @@ ggplot(df_long,aes(x,y,group=set))+
 ```{r}
 by(df_long[,2:3], df_long$set, summary)
 ```
+```{r}
+df_long %>% group_by(set) %>% summarize(mean_x=mean(x),
+                  mean_y=mean(y),
+                  sd_x=sd(x),
+                  sd_y=sd(y))
 
+```
 3) Correlation betveen x and y in each set. Parametric and non-parametric tests.
 
 ```{r}
@@ -66,7 +72,7 @@ spearman <- df_long %>%
   do(tidy(cor.test(.$x, .$y, method='spearman')))
 
 df_cor <- data.frame(pearson$estimate, pearson$p.value, spearman$estimate, spearman$p.value)
-df_cor
+print(df_cor)
 ```
 
 ### Air quality dataset
@@ -90,9 +96,9 @@ char_columns <- sapply(df, is.character)
 df[ , char_columns] <- lapply(df[ , char_columns] , function(x) as.numeric(gsub(",", ".", x)))
 
 # explore summary 
-summary(df)
+print(summary(df))
 
-head(df)
+print(head(df))
 
 # remove na
 df <- na.omit(df)
@@ -104,13 +110,17 @@ df_no200[] <- sapply(df[, 1:13] , function(x) {x[grep("-200", x)] = NA; return((
 str(df_no200)
 
 # replace na with median 
+#df_named <- replace(df_no200, TRUE, lapply(df_no200, function(x) replace(x, is.na(x), median(x, na.rm = TRUE))))
+
+df_no200 <- df_no200[!(is.na(df_no200$AH) | is.na(df_no200$NO2.GT.) | is.na(df_no200$CO.GT.)),]
+
 df_named <- replace(df_no200, TRUE, lapply(df_no200, function(x) replace(x, is.na(x), median(x, na.rm = TRUE))))
 
 # new summary without outliers
-summary(df_named)
+print(summary(df_named))
 
 # adding date_time column
-df_named$date_time <- df$date_time
+#df_named$date_time <- df$date_time
 
 
 ```
@@ -134,18 +144,18 @@ ggplot(long, aes(value)) +
 3) Let`s discovery cross-correlations
 ```{r}
 # plot correlations
-panel.points<-function(x,y)
-{
-  points(x,y,cex=.01)
-}
+#panel.points<-function(x,y)
+#{
+#  points(x,y,cex=.01)
+#}
 
-pairs(df_named[, 1:13], upper.panel = panel.points)
+#pairs(df_named, upper.panel = panel.points)
 
 # correlation heatmap - more comportable way to find cross-correlations
-cor_mtx <- (cor(df_named[,1:13]))
+cor_mtx <- (cor(df_named))
 
 # all correlations in mtx
-cor_mtx      
+print(cor_mtx )     
 
 # heatmap
 ggplot(data = melt(cor_mtx), aes(Var2, Var1, fill = value))+
@@ -159,7 +169,7 @@ ggplot(data = melt(cor_mtx), aes(Var2, Var1, fill = value))+
 4) Linear regression models. Variable C6H6.GT. against all other variables.
 
 ```{r}
-fit <- lm(data = df_named[,1:13], formula =  C6H6.GT. ~. ) 
+fit <- lm(data = df_named, formula =  C6H6.GT. ~. ) 
 
 # significant dependencies are marked with *** and **
 summary(fit)
@@ -182,12 +192,12 @@ Check C6H6.GT. against PT08.S1.CO.
 
 ```{r}
 # model
-fit_cogt <- lm(data = train[,1:13], formula =  C6H6.GT. ~ PT08.S1.CO. ) 
+fit_cogt <- lm(data = train, formula =  C6H6.GT. ~ PT08.S1.CO. ) 
 cogt <- summary(fit_cogt)
 cogt
 
 # plot
-ggplot(train[,1:13], aes( PT08.S1.CO., C6H6.GT.))+
+ggplot(train, aes( PT08.S1.CO., C6H6.GT.))+
   geom_point()+
   geom_smooth(method='lm')
 
@@ -210,11 +220,11 @@ We can see, that linear regression probably found the nonexistent dependency due
 ```{r}
 
 # model
-fit_t <- lm(data = train[,1:13], formula =  C6H6.GT. ~ T ) 
+fit_t <- lm(data = train, formula =  C6H6.GT. ~ T ) 
 t <- summary(fit_t)
 t
 
-ggplot(train[,1:13], aes( T, C6H6.GT.))+
+ggplot(train, aes( T, C6H6.GT.))+
   geom_point()+
   geom_smooth(method='lm')
 
