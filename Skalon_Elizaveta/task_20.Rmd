@@ -12,6 +12,8 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, error = FALSE)
 ```{r}
 library('ggplot2')
 library('ggpubr')
+library('dplyr')
+library('tidyr')
 ```
 
 ## 1. Measures of center
@@ -59,9 +61,10 @@ x_vec <- x
 
 ggplot()+
   geom_histogram(aes(x_vec), bins=40)+
-  geom_vline(aes(xintercept=mean(x_vec), col='red'))+
-  geom_vline(aes(xintercept=median(x_vec), col='blue'))+
-  geom_vline(aes(xintercept=mode_fun(x_vec), col='green'))
+  geom_vline(aes(xintercept=mean(x_vec), col='mean'))+
+  geom_vline(aes(xintercept=median(x_vec), col='median'))+
+  geom_vline(aes(xintercept=mode_fun(x_vec), col='mode'))+
+  scale_color_manual(name = "statistics", values = c(median = "blue", mean = "red", mode = 'green'))
 ```
 
 1.3 spoil your sample with the outlier - repeat steps 1.1 and 1.2
@@ -86,9 +89,10 @@ mode_fun(x_vec_bias)
 # plot
 ggplot()+
   geom_histogram(aes(x_vec_bias), bins=40)+
-  geom_vline(aes(xintercept=mean(x_vec_bias), col='red'))+
-  geom_vline(aes(xintercept=median(x_vec_bias), col='blue'))+
-  geom_vline(aes(xintercept=mode_fun(x_vec_bias)), col='green')
+  geom_vline(aes(xintercept=mean(x_vec_bias), col='mean'))+
+  geom_vline(aes(xintercept=median(x_vec_bias), col='median'))+
+  geom_vline(aes(xintercept=mode_fun(x_vec_bias), col='mode'))+
+  scale_color_manual(name = "statistics", values = c(median = "blue", mean = "red", mode = 'green'))
 
 
 
@@ -116,7 +120,7 @@ sd(x)
 2.1 visualize with the box plot and add horizontal lines for range, IQR, 1-sd borders (use built-ins)
 
 ```{r}
-boxplot(x)
+boxplot(x, pars=list(boxwex = 0.2))
 # range
 abline(h=range(x)[1])
 abline(h=range(x)[2])
@@ -125,6 +129,15 @@ abline(h=quantile(x, c(0.25, 0.75)), col="red")
 # 1-sd borders - blue line
 abline(h=(mean(x)-sd(x)), col='blue')
 abline(h = (mean(x)+sd(x)), col='blue')
+
+ggplot(as.data.frame(x), aes(y = x)) +
+  geom_boxplot(width=5) +
+  geom_hline(yintercept = range(x)[1]) +
+  geom_hline(yintercept = range(x)[0]) +
+  geom_hline(yintercept = quantile(x, c(0.25, 0.75)), color = "red") +
+  geom_hline(yintercept = (mean(x)-sd(x)), color = "blue")+
+  geom_hline(yintercept = (mean(x)+sd(x)), color = "blue")+
+  theme(aspect.ratio = 1)
 
 ```
 
@@ -142,6 +155,15 @@ abline(h=quantile(x_vec_bias, c(0.25, 0.75)), col="red")
 # 1-sd borders - blue line
 abline(h=(mean(x_vec_bias)-sd(x_vec_bias)), col='blue')
 abline(h = (mean(x_vec_bias)+sd(x_vec_bias)), col='blue')
+
+ggplot(as.data.frame(x_vec_bias), aes(y = x_vec_bias)) +
+  geom_boxplot(width=5) +
+  geom_hline(yintercept = range(x_vec_bias)[1]) +
+  geom_hline(yintercept = range(x_vec_bias)[0]) +
+  geom_hline(yintercept = quantile(x_vec_bias, c(0.25, 0.75)), color = "red") +
+  geom_hline(yintercept = (mean(x_vec_bias)-sd(x_vec_bias)), color = "blue")+
+  geom_hline(yintercept = (mean(x_vec_bias)+sd(x_vec_bias)), color = "blue")+
+  theme(aspect.ratio = 1)
 
 ```
 
@@ -178,76 +200,40 @@ rules2 <- c((mean(x) - 100), (mean(x) / 100), (var(x)), (var(x) / 10000), (sd(x)
 rul <- data.frame(names_, rules1, rules2)
 rul
 ```
+
 ```{r}
-# mean_extr
-a <- ggplot()  + 
-  geom_histogram(aes(x), bins=40) +
-  geom_vline(xintercept=mean(x-100), color="red") +
-  ggtitle(label = 'Mean(x-100)')
-
-b <- ggplot()  + 
-  geom_histogram(aes(x), bins=40) +
-  geom_vline(xintercept=mean(x)-100, color="red") +
-  ggtitle(label = 'Mean(x)-100)')
-
-ggarrange(a, b, ncol = 2, nrow = 1)
-
-# mean_div
-c <- ggplot()  + 
-  geom_histogram(aes(x), bins=40) +
-  geom_vline(xintercept=mean(x/100), color="red") +
-  ggtitle(label = 'Mean(x/100)')
-
-d <- ggplot()  + 
-  geom_histogram(aes(x), bins=40) +
-  geom_vline(xintercept=mean(x)/100, color="red") +
-  ggtitle(label = 'Mean(x)/100')
-
-ggarrange(c, d, ncol = 2, nrow = 1)
-
-# var_extr
-e <- ggplot()  + 
-  geom_histogram(aes(x), bins=40) +
-  geom_vline(xintercept=var(x), color="red") +
-  ggtitle(label = 'Var(x)')
-
-f <- ggplot()  + 
-  geom_histogram(aes(x), bins=40) +
-  geom_vline(xintercept=var(x-100), color="red") +
-  ggtitle(label = 'Var(x-100)')
-
-ggarrange(e, f, ncol = 2, nrow = 1)
-
-# var_div
-g <- ggplot()  + 
-  geom_histogram(aes(x), bins=40) +
-  geom_vline(xintercept=var(x/100), color="red") +
-  ggtitle(label = 'Var(x/100)')
-
-h <- ggplot()  + 
-  geom_histogram(aes(x), bins=40) +
-  geom_vline(xintercept=var(x)/1000, color="red") +
-  ggtitle(label = 'Var(x)/1000')
-
-ggarrange(g, h, ncol = 2, nrow = 1)
-
-# sd_div
-m <- ggplot()  + 
-  geom_histogram(aes(x), bins=40) +
-  geom_vline(xintercept=sd(x/100), color="red") +
-  ggtitle(label = 'sd(x/100)')
-
-n <- ggplot()  + 
-  geom_histogram(aes(x), bins=40) +
-  geom_vline(xintercept=sd(x)/100, color="red") +
-  ggtitle(label = 'sd(x)/100')
-
-ggarrange(m, n, ncol = 2, nrow = 1)
-
+df <- data.frame("x" = x , "xmin100" = x-100, "xdel100" = x/100)
+m <-  ggplot(df, aes(x))+
+      geom_density()+
+      geom_vline(xintercept=mean(df$x),col='red')
+n <-  ggplot(df, aes(xmin100))+
+      geom_density()+
+      geom_vline(xintercept=mean(df$xmin100),col='red')
+k <-  ggplot(df, aes(xdel100))+
+      geom_density()+
+      geom_vline(xintercept=mean(df$xdel100),col='red')
+fig <- ggarrange(m, n, k, ncol = 1, nrow = 3)
+annotate_figure(fig, top = text_grob("Mean rules", face = "bold", size = 14))
 
 ```
+```{r}
+df1 <- data.frame("var_x" = x , "varxmin100" = x-100, "varxdel100" = (x / 100))
+f <-  ggplot(df1, aes(var_x))+
+      geom_density()+
+      geom_vline(xintercept=(mean(df1$var_x)-sd(df1$var_x)),col='red')+
+      geom_vline(xintercept=(mean(df1$var_x)+sd(df1$var_x)),col='red')
+l<-  ggplot(df1, aes(varxmin100))+
+      geom_density()+
+      geom_vline(xintercept=(mean(df1$varxmin100)-sd(df1$varxmin100)),col='red')+
+      geom_vline(xintercept=(mean(df1$varxmin100)+sd(df1$varxmin100)),col='red')
+r<-  ggplot(df1, aes(varxdel100))+
+      geom_density()+
+      geom_vline(xintercept=(mean(df1$varxdel100)-sd(df1$varxdel100)),col='red')+
+      geom_vline(xintercept=(mean(df1$varxdel100)+sd(df1$varxdel100)),col='red')
+fig1 <- ggarrange(f, l, r, ncol = 1, nrow = 3)
+annotate_figure(fig1, top = text_grob("Standart deviation rules", face = "bold", size = 14))
 
-
+```
 ## 4. Normal distribution
 
 4.0 for the population N(175, 10) find the probability to be:
