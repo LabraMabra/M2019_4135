@@ -1,0 +1,240 @@
+---
+title: "HW2_3"
+author: "Maria Firulyova"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.width=12, fig.height=8, message = F, warning = F)
+```
+
+```{r}
+library(MASS)
+library(data.table)
+library(dplyr)
+library(ggplot2)
+library(caret)
+library(boot)
+library(corrplot)
+```
+
+## Load data
+
+```{r}
+data(Boston)
+Boston <- Boston %>% mutate(chas = as.factor(chas))
+str(Boston)
+
+knitr::kable(apply(Boston, 2, function(x) round(sum(is.na(x)) / length(x), 2)) %>%
+               as.data.frame() %>% magrittr::set_colnames('na_percentage'))
+```
+
+Investigate variables' distributions
+
+```{r}
+bos_num <- Boston %>% select_if(is.numeric)
+bos_long <- melt(bos_num)
+
+ggplot(bos_long, aes(x = value))+
+  geom_histogram(col = 'black', fill='white')+
+  theme_bw()+
+  facet_wrap(~variable, scales = 'free')
+```
+
+Investigate correlations
+
+```{r}
+
+get_upper_tri <- function(cormat){
+  cormat[lower.tri(cormat)]<- NA
+  cormat
+}
+
+reorder_cormat <- function(cormat){
+  dd <- as.dist((1-cormat)/2)
+  hc <- hclust(dd)
+  cormat <-cormat[hc$order, hc$order]
+}
+
+get_corplot <- function(df) {
+  cor_mat <- cor(df, use = "complete.obs", method = "spearman")
+  cor_mat <- reorder_cormat(cor_mat)
+  upper_tri <- get_upper_tri(cor_mat)
+  melted_cormat <- melt(upper_tri, na.rm = TRUE) %>% mutate(value = round(value, 3))
+  ggheatmap <- ggplot(melted_cormat, aes(Var2, Var1, fill = value))+
+    geom_tile(color = "white")+
+    scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
+                         midpoint = 0, limit = c(-1,1), space = "Lab", 
+                         name="Spearman\nCorrelation") +
+    theme_minimal()+
+    theme(axis.text.x = element_text(angle = 45, vjust = 1, 
+                                     size = 12, hjust = 1))+
+    coord_fixed()
+  ggheatmap+
+    geom_text(aes(Var2, Var1, label = value), color = "black", size = 4) +
+    theme(
+      axis.title.x = element_blank(),
+      axis.title.y = element_blank(),
+      panel.grid.major = element_blank(),
+      panel.border = element_blank(),
+      panel.background = element_blank(),
+      axis.ticks = element_blank(),
+      legend.justification = c(1, 0),
+      legend.position = c(0.6, 0.7),
+      legend.direction = "horizontal")+
+    guides(fill = guide_colorbar(barwidth = 7, barheight = 1,
+                                 title.position = "top", title.hjust = 0.5))
+}
+
+get_corplot(bos_num)
+```
+
+Data categorization
+
+```{r}
+bos_num <- as.data.table(bos_num)
+bos_num[, medv_f := cut(medv, quantile(bos_num$medv), labels = names(quantile(bos_num$medv))[2:length(quantile(bos_num$medv))])]
+bos_num[, medv_f := cut(medv, c(
+0,
+quantile(bos_num$medv, 0.33),
+quantile(bos_num$medv, 0.66),
+max(bos_num$medv)
+), labels = c("1", "2", "3"))]
+
+knitr::kable(bos_num[, table(medv_f)])
+```
+
+PCA
+
+```{r}
+set.seed(1)
+
+pca <-
+prcomp(select_if(bos_num, is.numeric),
+center = TRUE,
+scale. = TRUE)
+summary(pca)
+```
+
+Weights for the PC1-PC2
+
+```{r}
+weights <- function(pc_res){
+  loadings <- as.data.frame(pc_res$rotation)
+  aload <-  abs(loadings)
+  vars <- sweep(aload, 2, colSums(aload), "/")
+  pca1 <- as.data.frame(vars$PC1)
+  pca2 <- as.data.frame(vars$PC2)
+  rownames(pca1) <- rownames(vars)
+  colnames(pca1) <- 'PC1'
+  colnames(pca2) <- 'PC2'
+  cbind(pca1, pca2) %>% 
+    tibble::rownames_to_column() %>%
+    arrange(-PC1,-PC2) %>%
+    tibble::column_to_rownames()
+}
+
+knitr::kable(weights(pca))
+```
+
+```{r}
+df <- data.frame('medv_f' = bos_num$medv_f, pca$x[,1:2])
+ggplot(data = df) + 
+  geom_point(aes(x = PC1, y = PC2, col = medv_f))+
+  theme_bw()
+```
+
+Scree plot
+
+```{r}
+pca_var <- round(pca$sdev^2 / sum(pca$sdev^2) * 100, 1)
+barplot(pca_var, main='scree plot', xlab = 'PC', ylab = 'Percent variation')
+```
+
+Clustering
+
+```{r}
+set.seed(1)
+
+train_des <- createDataPartition(y = bos_num$medv_f, p= 0.7, list = FALSE)
+train_data <- bos_num[train_des, -13]
+test_data <- bos_num[-train_des, -13]
+# Repeat several times, 10 blocks, 3 times
+tr_ctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 5)
+knn_fit <- train(medv_f ~ ., data = train_data, method = "knn",
+ trControl=tr_ctrl,
+ preProcess = c("center", "scale"),
+ tuneLength = 20)
+summary(knn_fit)
+```
+
+```{r}
+ggplot(knn_fit$results, aes(x = k, y = Accuracy))+
+  geom_point()+
+  theme_bw()+
+  geom_line(col='red')+
+  scale_x_continuous(breaks = seq(min(knn_fit$results$k), max(knn_fit$results$k), 1))+
+  ggtitle('The highest accuracy: k = 7')
+```
+
+
+```{r}
+set.seed(1)
+test_pred <- predict(knn_fit, newdata = test_data)
+knn_fit <- knn3Train(train = train_data[,-13], test = test_data[,-13], k=7, cl = train_data$medv_f)
+xtab <- table(knn_fit, Real = test_data$medv_f)
+accuracy <- sum(knn_fit == test_data$medv_f)/length(test_data$medv_f)
+precision <- xtab[1,1]/sum(xtab[,1])
+recall <- xtab[1,1]/sum(xtab[1,])
+f <- 2 * (precision * recall) / (precision + recall)
+sprintf("Accuracy = %f", accuracy)
+sprintf("Precision = %f", precision)
+sprintf("Recall = %f", recall)
+sprintf("F-metrics = %f", f)
+```
+
+## Polynomial regression
+
+```{r}
+ggplot(Boston,aes(lstat,medv))+
+  geom_point()+
+  geom_smooth()
+```
+
+Log-transformed data
+
+```{r}
+Boston <- Boston %>%
+  mutate(log_lstat = log10(lstat)) %>%
+  mutate(log_medv = log10(medv))
+ggplot(Boston,aes(log_lstat,log_medv))+
+  geom_point()+
+  geom_smooth()
+```
+
+
+```{r}
+bos_num <- bos_num %>%
+  mutate(lstat = log10(lstat)) %>%
+  mutate(medv = log10(medv)) %>% 
+  as.data.table()
+
+bos_num[,medv_b:= cut(medv,c(0,median(bos_num$medv),max(bos_num$medv)), labels=c("low","high"))]
+```
+
+
+```{r}
+set.seed(1)
+bos_de <- bos_num[,-c(13, 14)]
+train_des <- createDataPartition(y = bos_de$medv_b, p= 0.7, list = FALSE)
+train_data <- bos_num[train_des,]
+test_data <- bos_num[-train_des,]
+errors <- sapply(1:10,
+                 function(x){
+                   g <- glm(medv_b ~ poly(lstat,x), family = "binomial", data = bos_de);
+                   cv.glm(bos_de, g)$delta[1]
+                   })
+plot(x = 1:10, y = errors, xlab = 'polynomial degree', ylab = 'cross-validation')
+mod <- glm(medv_b ~ poly(lstat, 2), data = bos_de, family = "binomial")
+summary(mod)
+```
