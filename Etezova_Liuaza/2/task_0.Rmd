@@ -8,7 +8,7 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r packages, message=F}
+```{r packages, warning=F}
 library(ggplot2)
 library(ggpubr)
 ```
@@ -130,8 +130,8 @@ iqr_x <- IQR(x)
 
 boxplot(x)
 abline(h = range(x), col="blue")
-abline(h = median_builtin_x + iqr_x, col="orange")
-abline(h = median_builtin_x - iqr_x, col="orange")
+abline(h = median_builtin_x + 1.5 * iqr_x, col="orange")
+abline(h = median_builtin_x - 1.5 * iqr_x, col="orange")
 abline(h = mean_builtin_x + sd_builtin_x, col="red")
 abline(h = mean_builtin_x - sd_builtin_x, col="red")
 ```
@@ -141,14 +141,13 @@ abline(h = mean_builtin_x - sd_builtin_x, col="red")
 iqr_outl <- IQR(x_outl)
 sd_outl <- sd(x_outl)
 
-boxplot(x_outl)
+boxplot(x_outl, ylim=c(0, 215))
 abline(h = range(x_outl), col="blue")
-abline(h = median_builtin_outl + iqr_outl, col="orange")
-abline(h = median_builtin_outl - iqr_outl, col="orange")
+abline(h = median_builtin_outl + 1.5 * iqr_outl, col="orange")
+abline(h = median_builtin_outl - 1.5 * iqr_outl, col="orange")
 abline(h = mean_builtin_outl + sd_outl, col="red")
 abline(h = mean_builtin_outl - sd_outl, col="red")
 ```
-(mean_builtin_outl + sd_outl) is outside of the plot.
 
 # 3. Properties
 
@@ -193,9 +192,10 @@ plot <- function(sample_id) {
     aes(column[4:13]) +
     geom_density() +
     geom_vline(aes(xintercept=column[[1]], color="mean")) +
-    geom_vline(aes(xintercept=column[[2]], color="var")) +
-    geom_vline(aes(xintercept=column[[3]], color="sd")) +
-    xlab(sample_id)
+    geom_vline(aes(xintercept=column[[1]] - column[[3]], color="+/- 1 sd")) + 
+    geom_vline(aes(xintercept=column[[1]] + column[[3]], color="+/- 1 sd")) + 
+    xlab(sample_id) + 
+    ggtitle(paste("var = ", column[[2]]))
 }
 
 # not working with cycle; with cycle through samples_ids instead of apply 
@@ -227,12 +227,18 @@ sum(sample > 168 & sample < 172) / obs
 ```{r sds}
 # mean = 0, sd = 1
 sample <- rnorm(obs)
+
 # +/- 1 sd: 68%
 sum(sample > -1 & sample < 1) / obs
+pnorm(1) - pnorm(-1)
+
 # +/- 2 sd: 95%
 sum(sample > -2 & sample < 2) / obs
+pnorm(2) - pnorm(-2)
+
 # +/- 3 sd: 99.7%
 sum(sample > -3 & sample < 3) / obs
+pnorm(3) - pnorm(-3)
 ```
 
 ## Standardization
@@ -278,7 +284,10 @@ plot <- function(k) {
     aes(distr[[as.character(k)]]) +
     geom_histogram() +
     geom_vline(aes(xintercept=stat[stat$k == k, 2], color="mean")) +
-    geom_vline(aes(xintercept=stat[stat$k == k, 4], color="SE")) +
+    geom_vline(aes(xintercept=stat[stat$k == k, 2] - stat[stat$k == k, 4], 
+                   color="+/- 1 SE")) +
+    geom_vline(aes(xintercept=stat[stat$k == k, 2] + stat[stat$k == k, 4], 
+                   color="+/- 1 SE")) +
     xlab(paste(k, " observations")) +
     xlim(-0.5, 0.5)
 }
