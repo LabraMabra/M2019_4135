@@ -8,7 +8,7 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r packages, warning=F}
+```{r packages, message=F}
 library(ggplot2)
 library(ggpubr)
 ```
