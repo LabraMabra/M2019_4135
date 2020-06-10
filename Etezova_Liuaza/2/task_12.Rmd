@@ -1,0 +1,105 @@
+---
+title: "Statistics in R: Task 12"
+author: "Liuaza Etezova"
+output: pdf_document
+---
+
+```{r setup, include=F}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = '/Users/Nexenta/prg/r/')
+```
+
+```{r packages, message=F}
+library(corrplot)
+library(car)
+library(ggfortify)
+```
+
+# Air Quality (multiple linear regression)
+
+## Preprocessing
+```{r preprocessing}
+air_quality <- read.csv('AirQualityUCI.csv', sep=';')
+
+air_quality <- air_quality[-c(9358:nrow(air_quality)), 
+                           !(names(air_quality) %in% c('Date', 'Time', 'X','X.1'))] 
+
+columns <- c('CO.GT.', 'C6H6.GT.', 'T', 'RH', 'AH')
+air_quality[columns] <- lapply(air_quality[columns], function(x) gsub(",", ".", x))
+air_quality[columns] <- lapply(air_quality[columns], as.numeric)
+
+air_quality[air_quality == -200] <- NA
+```
+
+```{r str}
+str(air_quality)
+```
+
+```{r summary}
+summary(air_quality)
+```
+
+## Exploring multicollinearity
+```{r cross correlations}
+cors <- cor(air_quality, use='pairwise.complete.obs', method='spearman')
+```
+
+```{r corrplot}
+corrplot.mixed(cors, order='hclust', lower='number', tl.pos='lt', tl.col='black', 
+               number.cex=0.55)
+```
+
+```{r model all}
+model_all <- lm(C6H6.GT. ~., data = air_quality)
+summary(model_all)
+```
+
+```{r vif1}
+vif(model_all)
+```
+
+
+```{r model vif}
+model_vif <- lm(C6H6.GT. ~ NO2.GT. + NMHC.GT. + PT08.S5.O3., data = air_quality)
+summary(model_vif)
+```
+
+```{r vif2}
+vif(model_vif)
+```
+
+## Checking residuals & Transforming selected predictors
+```{r no2gt}
+model <- lm(C6H6.GT. ~ NO2.GT., data = air_quality)
+autoplot(model)
+```
+```{r no2gt transformation}
+model <- lm(log10(C6H6.GT.) ~ NO2.GT., data = air_quality)
+autoplot(model)
+```
+
+
+```{r nmhcgt}
+model <- lm(C6H6.GT. ~ NMHC.GT., data = air_quality)
+autoplot(model)
+```
+
+```{r nmhcgt transformation}
+model <- lm(C6H6.GT. ~ I(NMHC.GT.^0.7), data = air_quality)
+autoplot(model)
+```
+
+```{r pt08s5o3}
+model <- lm(C6H6.GT. ~ PT08.S5.O3., data = air_quality)
+autoplot(model)
+```
+```{r pt08s5o3 transformation}
+model <- lm(C6H6.GT. ~ I(PT08.S5.O3.^1.5), data = air_quality)
+autoplot(model)
+```
+
+## The final linear model
+```{r lm}
+final_model <- lm(C6H6.GT. ~ NO2.GT. + I(NMHC.GT.^0.7) + I(PT08.S5.O3.^1.5), data = air_quality)
+summary(final_model)
+```
