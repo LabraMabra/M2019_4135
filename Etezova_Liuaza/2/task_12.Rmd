@@ -50,7 +50,7 @@ corrplot.mixed(cors, order='hclust', lower='number', tl.pos='lt', tl.col='black'
 ```
 
 ```{r model all}
-model_all <- lm(C6H6.GT. ~., data = air_quality)
+model_all <- lm(C6H6.GT. ~ ., data = air_quality)
 summary(model_all)
 ```
 
@@ -60,12 +60,18 @@ vif(model_all)
 
 
 ```{r model vif}
-model_vif <- lm(C6H6.GT. ~ NO2.GT. + NMHC.GT. + PT08.S5.O3., data = air_quality)
-summary(model_vif)
+model_vif_2p <- lm(C6H6.GT. ~ NO2.GT. + NMHC.GT., data = air_quality)
+summary(model_vif_2p)
+
+model_vif_3p <- lm(C6H6.GT. ~ NO2.GT. + NMHC.GT. + PT08.S5.O3., data = air_quality)
+summary(model_vif_3p)
+
+model_vif_4p <- lm(C6H6.GT. ~ NO2.GT. + NMHC.GT. + PT08.S5.O3. + NOx.GT., data = air_quality)
+summary(model_vif_4p)
 ```
 
 ```{r vif2}
-vif(model_vif)
+vif(model_vif_3p)
 ```
 
 ## Checking residuals & Transforming selected predictors
@@ -100,6 +106,9 @@ autoplot(model)
 
 ## The final linear model
 ```{r lm}
-final_model <- lm(C6H6.GT. ~ NO2.GT. + I(NMHC.GT.^0.7) + I(PT08.S5.O3.^1.5), data = air_quality)
-summary(final_model)
+final_model0 <- lm(C6H6.GT. ~ NO2.GT. + I(NMHC.GT.^0.7) + PT08.S5.O3., data = air_quality)
+summary(final_model0)
+
+final_model1 <- lm(C6H6.GT. ~ NO2.GT. + I(NMHC.GT.^0.7) + I(PT08.S5.O3.^1.5), data = air_quality)
+summary(final_model1)
 ```
