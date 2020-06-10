@@ -1,5 +1,5 @@
 ---
-title: "Statistics in R: Task 1"
+title: "Statistics in R: Task 11"
 author: "Liuaza Etezova"
 output: pdf_document
 ---
