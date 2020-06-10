@@ -1,0 +1,239 @@
+---
+title: "Hw_5"
+author: "Valeriia"
+date: "07 06 2020"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r message=FALSE, warning=FALSE}
+library(cluster)
+library(fpc)
+library(factoextra)
+library(dplyr)
+library(FactoMineR)
+library(ggplot2)
+library(MASS)
+```
+K-means. 
+```{r}
+data(Boston)
+x <-  as.matrix(Boston) # Сначала посмотрим хитмап, как влияют данные друг на друга
+rc <- rainbow(nrow(x), start = 0, end = .3)
+cc <- rainbow(ncol(x), start = 0, end = .3)
+hv <- heatmap(x,  scale = "col",  RowSideColors = rc,
+           ColSideColors = cc, margins = c(10,10),
+           cexCol = 1.5, cexRow = 1)
+
+value <- rep(0,10) # Определим количество к, оптимально3
+set.seed(3)
+for (i in 1:10){
+  value[i] <- kmeans(Boston, i, nstart = 20)$tot.withinss
+}
+plot(value, type = "b")
+
+df.stand <- scale(Boston)
+clus <- kmeans(df.stand, centers = 3, nstart = 20)
+plotcluster(Boston, clus$cluster)
+```
+
+```{r}
+set.seed(3)
+boston <- as.data.frame(Boston)
+clusters <- kmeans(df.stand, 3)
+boston$cluster <- clusters$cluster
+aggregate(data = boston, medv ~ cluster, mean) #Посмотрим разделение на примере цены за квартиру
+```
+PAM method.
+Метод PAM во многом идентичен алгоритму  k  средних за исключением того, что вместо вычисления центроидов осуществляется поиск  k  наиболее представительных объектов (или медоидов) среди анализируемых наблюдений. Внутрикластерный разброс оценивается при этом по манхэттенскому, а не евклидовому расстоянию, как в kmeans().
+```{r}
+set.seed(123)
+df.stand <- as.data.frame(scale(Boston))
+k.pam <- pam(df.stand, k = 3)
+fviz_silhouette(silhouette(k.pam))
+fviz_nbclust(df.stand, pam, method = "silhouette") #Оптимальное кол-во кластеров 2
+fviz_cluster(pam(df.stand, 2), stand = FALSE)
+```
+
+Hierarchical
+
+алгоритм средней связи (average linkage clustering) на каждом следующем шаге объединяет два ближайших кластера, рассчитывая среднюю арифметическую дистанцию между всеми парами объектов. К алгоритму средней связи естественно сразу добавить еще два со взаимно противоположными тенденциями:
+алгоритм одиночной связи, или “ближайшего соседа” (single linkage clustering), когда расстояние между кластерами оценивается как минимальное из дистанций между парами объектов, один из которых входит в первый кластер, а другой - во второй;
+и алгоритм полной связи или “дальнего соседа” (complete linkage clustering), когда вычисляется расстояние между наиболее удаленными объектами.
+
+```{r}
+d <- dist(df.stand, method = "euclidean")
+# Параметр hang=-1  выравнивает метки
+plot(hclust(d, method = "average" ), cex = 0.7, hang = -1)
+plot(hclust(d, method = "single" ), cex = 0.7, hang = -1)
+
+res.hc <- hclust(d, method = "complete" )
+grp <- cutree(res.hc, k = 3)  # Разрезание дерева на 3 группы
+plot(res.hc, cex = 0.7)
+rect.hclust(res.hc, k = 4, border = 2:5)
+
+hcd <- as.dendrogram(hclust(d, method = "ward.D2" )) #метод Уорда
+nodePar <- list(lab.cex = 0.7, pch = c(NA, 19), cex = 0.7, col = "blue")
+plot(hcd,  xlab = "Height", nodePar = nodePar, horiz = TRUE,
+     edgePar = list(col = 2:3, lwd = 2:1))
+```
+Для количественной оценки различий между вариантами кластеризации могут быть использованы кофенетическая корреляция (cophenetic correlation) или различные ранговые индексы. Кофенетическая дистанция определяет расстояние между двумя объектами на дендрограмме и отражает уровень внутригрупповых различий, при котором эти объекты были впервые объединены в один кластер (Ким и др., 1989). Все возможные пары таких дистанций образуют апостериорную матрицу расстояний между объектами по результатам кластеризации. Кофенетическая корреляция вычисляется как линейный коэффициент корреляции Пирсона (или ранговый коэффициент Спирмена) между всеми элементами двух таких матриц:
+```{r}
+library(dendextend)
+# Создаем множество дендрограмм для сравнения
+dend1 <- d %>% hclust("com") %>% as.dendrogram
+dend2 <- d %>% hclust("single") %>% as.dendrogram
+dend3 <- d %>% hclust("ave") %>% as.dendrogram
+dend4 <- d %>% hclust("centroid") %>% as.dendrogram
+dend5 <- d %>% hclust("ward.D2") %>% as.dendrogram
+
+# Создаем список дендрограмм и корреляционную матрицу
+dend_list <- dendlist("Complete" = dend1, "Single" = dend2,
+     "Average" = dend3, "Centroid" = dend4, "Ward.D2" = dend5)
+cors <- cor.dendlist(dend_list)
+round(cors, 2)
+library(corrplot) # изображение корреляционной матрицы
+corrplot(cors, "pie", "lower")
+```
+Иерархическая кластеризация на главные компоненты
+
+В среде R кластеризация на главные компоненты реализована в пакете FactoMineR и состоит из двух шагов. На первом этапе функцией РСА() выполняется обычный анализ главных компонент и выбирается их число. Далее функция HCPC() использует эти результаты и строит иерархическую кластеризацию. При этом используется метод Уорда, который, как и анализ главных компонент, основан на анализе многомерной дисперсии (inertia).
+```{r}
+df.scale <- scale(Boston)
+res.pca <- PCA(df.scale, ncp = 5, graph = TRUE)
+get_eig(res.pca)
+res.hcpc <- HCPC(res.pca, graph = FALSE)
+plot(res.hcpc, choice = "tree")
+plot(res.hcpc, choice = "3D.map", ind.names = FALSE)
+```
+PCA
+```{r}
+boston_pca <- boston[,-c(14,15)]
+boston_pca <- scale(boston_pca)
+pca <- prcomp(x = boston_pca, center = TRUE, scale = TRUE)
+pca
+summary(pca)
+biplot(pca)
+plot(cumsum(pca$sdev)/sum(pca$sdev), ylab = "Доля объясненной диспресии")
+pca_adj <- data.frame(pca$x, medv = as.factor(boston$cluster))
+p1 <- ggplot(data = pca_adj,
+             aes(x = PC1,
+                 y = PC2,
+                 color = medv)) +
+  geom_point()+
+  labs(x = "PC1 (47%)")+
+  labs(y = "PC2 (11%)")
+p1
+
+p2 <- ggplot(data = pca_adj,
+             aes(x = PC1,
+                 fill = medv))+
+  geom_histogram(alpha = 0.6,
+                 color = "black",
+                 bins = 25,
+                 position = "identity")+
+  labs(x = "PC1 (47%)")
+p2
+
+p3 <- ggplot(data = pca_adj,
+             aes(x = PC1,
+                 y = PC3,
+                 color = medv)) +
+  geom_point()+
+  labs(x = "PC1 (47%)")+
+  labs(y = "PC3 (9%)")
+p3
+```
+
+```{r}
+tune <- pca_adj[,1:7] #7 компонент объясняют 80%
+dist <- dist(tune)
+plot(hclust(dist, method = "average" ), hang = -1, labels = pca_adj$medv)
+plot(hclust(dist, method = "single" ), hang = -1, labels = pca_adj$medv)
+plot(hclust(dist, method = "complete" ), hang = -1, labels = pca_adj$medv)
+hc_tune <- hclust(dist, method = "complete" )
+plot(hc_tune, hang = -1, labels = pca_adj$medv)
+rect.hclust(hc_tune, k=2)
+plot(hc_tune, hang = -1, labels = pca_adj$medv)
+rect.hclust(hc_tune, k=7)
+table(pca_adj$medv, cutree(hc_tune, 2))
+table(pca_adj$medv, cutree(res.hc, 2))
+table(pca_adj$medv, cutree(hc_tune, 3))
+table(pca_adj$medv, cutree(res.hc, 3))
+table(pca_adj$medv, cutree(hc_tune, 4))
+table(pca_adj$medv, cutree(res.hc, 4))
+table(pca_adj$medv, cutree(hc_tune, 5))
+table(pca_adj$medv, cutree(res.hc, 5))
+table(pca_adj$medv, cutree(hc_tune, 6))
+table(pca_adj$medv, cutree(res.hc, 6))
+table(pca_adj$medv, cutree(hc_tune, 7))
+table(pca_adj$medv, cutree(res.hc, 7))
+data_pca_clust <- data.frame(pca$x[,1:2],
+                             k2 = factor(cutree(hc_tune, 2)),
+                             k3 = factor(cutree(hc_tune, 3)),
+                             k4 = factor(cutree(hc_tune, 4)),
+                             k5 = factor(cutree(hc_tune, 5)),
+                             k6 = factor(cutree(hc_tune, 6)),
+                             k7 = factor(cutree(hc_tune, 7)),
+                             label = pca_adj$medv)
+p4 <- ggplot(data_pca_clust,
+             aes(x = PC1,
+                 y = PC2,
+                 color = k2,
+                 label = pca_adj$medv))+
+  geom_point()+
+  geom_label()+
+  theme_bw()
+p4
+
+p5 <- ggplot(data_pca_clust,
+             aes(x = PC1,
+                 y = PC2,
+                 color = k3,
+                 label = pca_adj$medv))+
+  geom_point()+
+  geom_label()+
+  theme_bw()
+p5
+
+p6 <- ggplot(data_pca_clust,
+             aes(x = PC1,
+                 y = PC2,
+                 color = k4,
+                 label = pca_adj$medv))+
+  geom_point()+
+  geom_label()+
+  theme_bw()
+p6
+
+p7 <- ggplot(data_pca_clust,
+             aes(x = PC1,
+                 y = PC2,
+                 color = k5,
+                 label = pca_adj$medv))+
+  geom_point()+
+  geom_label()+
+  theme_bw()
+p7
+
+p8 <- ggplot(data_pca_clust,
+             aes(x = PC1,
+                 y = PC2,
+                 color = k6,
+                 label = pca_adj$medv))+
+  geom_point()+
+  geom_label()+
+  theme_bw()
+p8
+
+p9 <- ggplot(data_pca_clust,
+             aes(x = PC1,
+                 y = PC2,
+                 color = k7,
+                 label = pca_adj$medv))+
+  geom_point()+
+  geom_label()+
+  theme_bw()
+p9
+```
