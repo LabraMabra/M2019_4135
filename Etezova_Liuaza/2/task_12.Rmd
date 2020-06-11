@@ -111,4 +111,7 @@ summary(final_model0)
 
 final_model1 <- lm(C6H6.GT. ~ NO2.GT. + I(NMHC.GT.^0.7) + I(PT08.S5.O3.^1.5), data = air_quality)
 summary(final_model1)
+
+final_model2 <- lm(C6H6.GT. ~ I(NMHC.GT.^0.7) + I(PT08.S5.O3.^1.5), data = air_quality)
+summary(final_model2)
 ```
