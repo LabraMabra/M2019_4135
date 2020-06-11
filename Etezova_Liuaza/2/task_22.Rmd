@@ -1,0 +1,154 @@
+---
+title: 'Statistics in R: Task 22'
+author: "Liuaza Etezova"
+output: pdf_document
+---
+
+```{r setup, include=F}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r packages, message=F}
+library(mlbench)
+library(dplyr)
+library(randomForest)
+```
+
+# Random Forest
+
+```{r data}
+data(Vehicle)
+df <- Vehicle
+str(df)
+summary(df$Class)
+```
+
+```{r refactoring}
+df <- df %>%
+    filter(Class != 'opel')
+df$Class <- factor(df$Class)
+str(df)
+summary(df$Class)
+```
+
+## Bagging Trees
+```{r bagging}
+set.seed(1)
+
+train <- sample(1:nrow(df), nrow(df)/2)
+bag <- randomForest(Class ~ ., data = df,
+                    subset = train,
+                    mtry = 18,
+                    importance = T)
+bag
+```
+
+```{r bagging ntree}
+set.seed(1)
+
+bag <- randomForest(Class ~ ., data = df,
+                    subset = train,
+                    ntree = 25,
+                    mtry = 18,
+                    importance = T)
+bag
+```
+
+
+## Random Forest
+```{r rf simple}
+set.seed(1)
+
+rf <- randomForest(Class ~ .,
+                   data = df,
+                   subset = train,
+                   mtry = 9,
+                   importance = T)
+rf
+```
+
+```{r rf params}
+sample_size <- ceiling(.632*nrow(df[-train,]))
+vars <- floor(sqrt(ncol(df)))
+sample_size
+vars
+```
+
+```{r rf}
+set.seed(1)
+rf <- randomForest(Class ~ .,
+                   data = df,
+                   subset = train,
+                   mtry = vars,
+                   sampsize = sample_size,
+                   importance = T)
+rf
+# the smallest error rate for now
+```
+
+```{r rf test}
+# test
+est_class <- predict(rf, newdata = df[-train,])
+mean(est_class != df$Class[-train])
+# error rate for the test data is larger maybe because of overfitting, 
+#                                        maybe because of unforfunate choice of test/train data
+```
+
+```{r overfitting - steps}
+set.seed(1)
+
+ntrees <- 500
+rf <- randomForest(Class ~ .,
+                   data = df,
+                   subset = train,
+                   ntree = ntrees,
+                   mtry = vars,
+                   sampsize = sample_size,
+                   importance = T,
+                   do.trace = ntrees/10)
+rf
+```
+
+```{r overfitting - steps2}
+set.seed(1)
+
+ntrees <- 300
+rf <- randomForest(Class ~ .,
+                   data = df,
+                   subset = train,
+                   ntree = ntrees,
+                   mtry = vars,
+                   sampsize = sample_size,
+                   importance = T,
+                   do.trace = ntrees/30)
+rf
+```
+
+```{r rf ntrees}
+set.seed(1)
+
+ntrees <- 230
+rf <- randomForest(Class ~ .,
+                   data = df,
+                   subset = train,
+                   ntree = ntrees,
+                   mtry = vars,
+                   sampsize = sample_size,
+                   importance = T)
+rf
+```
+
+```{r rf ntrees test}
+est_class <- predict(rf, newdata = df[-train,])
+mean(est_class != df$Class[-train])
+```
+
+```{r importance}
+importance(rf)
+# Max.L.Ra - max length rectangularity
+```
+
+```{r importance plot}
+varImpPlot(rf)
+```
+
