@@ -1,0 +1,180 @@
+---
+title: "Random Forest"
+author: "Lisa Skalon"
+date: '11 июня 2020 г '
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE, error=FALSE, message=FALSE)
+```
+
+
+```{r results='hide'}
+library(ggplot2)
+library(randomForest)
+library(MASS)
+library(tree)
+library(dplyr)
+library(tidyr)
+library(caret)
+library(psych)
+```
+
+
+We are going to analyze open dataset with heart disease data, available at UCI (https://archive.ics.uci.edu/ml/datasets/Heart+Disease). The description of variables: 
+
+1. **age**: age in years 
+2. **sex**: sex (1 = male; 0 = female)
+3. **cp**: chest pain type
+      * Value 1: typical angina
+      * Value 2: atypical angina
+      * Value 3: non-anginal pain
+      * Value 4: asymptomatic
+4. **trestbps** : resting blood pressure (in mm Hg on admission to the hospital)
+5. **chol**: serum cholestoral in mg/dl
+6. **fbs**: (fasting blood sugar > 120 mg/dl)  (1 = true; 0 = false)
+7. **restecg**: resting electrocardiographic results
+      * Value 0: normal
+      * Value 1: having ST-T wave abnormality (T wave inversions and/or ST elevation or depression of > 0.05 mV)
+      * Value 2: showing probable or definite left ventricular hypertrophy by Estes' criteria
+8. **thalach**: maximum heart rate achieved
+9. **exang**: exercise induced angina (1 = yes; 0 = no)
+10. **oldpeak**: ST depression induced by exercise relative to rest
+11. **slope**: the slope of the peak exercise ST segment
+      * Value 1: upsloping
+      * Value 2: flat
+      * Value 3: downsloping
+12. **ca**: number of major vessels (0-3) colored by flourosopy
+13. **thal**: 3 = normal; 6 = fixed defect; 7 = reversable defect
+14. **num**: 0 = no heart disease, > 0 = heart disease
+
+
+The variable wich we are going to predict is **num** - the presence or the absence of heart disease. 
+
+We will use randomForest algorithm - algorithm which works by aggregating the predictions made by multiple decision trees of varying depth. Every decision tree in the forest is trained on a subset of the dataset called the bootstrapped dataset.
+
+
+```{r}
+# read df
+df <- read.csv("https://archive.ics.uci.edu/ml/machine-learning-databases/heart-disease/processed.cleveland.data",header=FALSE, na.strings = '?')
+names(df) <- c( "age", "sex", "cp", "trestbps", "chol","fbs", "restecg",
+                   "thalach","exang", "oldpeak","slope", "ca", "thal", "num")
+
+# deal with na
+str(df)
+sum(is.na(df))
+df <- drop_na(df)
+
+# change num to binary as in the description
+df$num[df$num > 0] <- 1
+
+
+# change data types 
+df <- transform(df, trestbps = as.factor(sex), cp = as.factor(cp), fbs = as.factor(fbs),
+                exang = as.factor(exang), restecg = as.factor(restecg), 
+                slope = as.factor(slope), ca = as.factor(ca), thal=as.factor(thal),
+                sex = as.factor(sex), num=as.factor(num))
+
+
+summary(df)
+
+# check the number of diseased/healthy obs
+table(df$num)
+```
+
+
+We divide the dataset 50/50 (train-test split)
+```{r}
+set.seed(42)
+sample <- sample.int(n=  nrow(df), size = floor(.5*nrow(df)), replace = F)
+train <- df[sample,]
+test <- df[-sample,]
+```
+
+
+First we run RF with basic parameters (mtry 3, ntree 500)
+```{r}
+fit <- randomForest(num ~ ., data = train, importance = T)
+fit
+```
+
+We can check the importance of each feature
+```{r}
+importance(fit)
+varImpPlot(fit)
+
+```
+
+Let`s predict values in test dataset
+```{r}
+pred <- predict(fit, newdata = test[-14])
+confusionMatrix(pred, test$num)
+```
+
+We can tune mtry hyperparameter - number of variables randomly sampled as candidates of each split. We also can tune number of trees (manually). 
+
+We will tune mtry using cross-validation and caret package
+
+```{r}
+control <- trainControl(method = "cv", 
+                        number = 10)
+rf_tune <- train(num ~ ., data = df, method = "rf", metric= 'Accuracy',
+               tuneLength=15, trControl=control)
+print(rf_tune)
+plot(rf_tune)
+
+```
+The best mtry = 2
+
+```{r}
+fit2 <- randomForest(num ~ ., data = train, 
+                    mtry = 2, importance = T)
+fit2
+pred2 <- predict(fit2, newdata = test[-14])
+confusionMatrix(pred2, test$num)
+```
+
+```{r}
+importance(fit2)
+varImpPlot(fit2)
+
+```
+
+
+We also can tune mtry with basic randomForest function tuneRF, but the resultis the same
+
+```{r}
+mtry_best = tuneRF(df[-14], df$num)
+print(mtry_best)
+
+```
+
+Now we will try to use feture selection and tune mtry for feature selected df
+```{r}
+
+mtry_best = tuneRF(df[, c("cp", "thal", "age", "thalach", "oldpeak")], df$num)
+```
+
+```{r}
+train_best <- train[,c("cp", "thal", "age", "thalach", "oldpeak", "num")]
+fit_best <- randomForest(num ~ ., data=train_best, 
+                    mtry = 2, importance = T)
+fit_best
+pred_best <- predict(fit_best, newdata = test[-14])
+confusionMatrix(pred_best, test$num)
+```
+
+We also can adjust ntree.
+
+```{r}
+fit_n <- randomForest(num ~ ., data = train, 
+                    mtry = 2, ntree = 2000, importance = T)
+fit_n
+pred_n <- predict(fit_n, newdata = test[-14])
+confusionMatrix(pred_n, test$num)
+```
+
+
+
+  

@@ -1,0 +1,242 @@
+---
+title: "classification: knn, logreg"
+author: "Lisa Skalon"
+date: "6/9/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, error = FALSE, message = FALSE)
+```
+
+```{r results="hide"}
+library('ggplot2')
+library('ggpubr')
+library('dplyr')
+library('tidyr')
+library(class)
+library(psych)
+library(caret)
+library(ROCR)
+library(reshape2)
+library(boot)
+```
+
+We are going to analyze open dataset with heart disease data, available at UCI (https://archive.ics.uci.edu/ml/datasets/Heart+Disease). The description of variables: 
+
+1. **age**: age in years 
+2. **sex**: sex (1 = male; 0 = female)
+3. **cp**: chest pain type
+      * Value 1: typical angina
+      * Value 2: atypical angina
+      * Value 3: non-anginal pain
+      * Value 4: asymptomatic
+4. **trestbps** : resting blood pressure (in mm Hg on admission to the hospital)
+5. **chol**: serum cholestoral in mg/dl
+6. **fbs**: (fasting blood sugar > 120 mg/dl)  (1 = true; 0 = false)
+7. **restecg**: resting electrocardiographic results
+      * Value 0: normal
+      * Value 1: having ST-T wave abnormality (T wave inversions and/or ST elevation or depression of > 0.05 mV)
+      * Value 2: showing probable or definite left ventricular hypertrophy by Estes' criteria
+8. **thalach**: maximum heart rate achieved
+9. **exang**: exercise induced angina (1 = yes; 0 = no)
+10. **oldpeak**: ST depression induced by exercise relative to rest
+11. **slope**: the slope of the peak exercise ST segment
+      * Value 1: upsloping
+      * Value 2: flat
+      * Value 3: downsloping
+12. **ca**: number of major vessels (0-3) colored by flourosopy
+13. **thal**: 3 = normal; 6 = fixed defect; 7 = reversable defect
+14. **num**: 0 = no heart disease, > 0 = heart disease
+
+
+The variable wich we are going to predict is **num** - the presence or the absence of heart disease. 
+
+We will use KNN algorithm, which classifies new cases based on a similarity measure (Euklidian distance, ..).
+The algorithm assumes that similar things exist in close proximity. The number of neighbors(K) is a tuned hyperparameter - we should manually choose the best K. 
+
+
+```{r}
+# read df
+df <- read.csv("https://archive.ics.uci.edu/ml/machine-learning-databases/heart-disease/processed.cleveland.data",header=FALSE, na.strings = '?')
+names(df) <- c( "age", "sex", "cp", "trestbps", "chol","fbs", "restecg",
+                   "thalach","exang", "oldpeak","slope", "ca", "thal", "num")
+
+# deal with na
+str(df)
+sum(is.na(df))
+df <- drop_na(df)
+
+# change num to binary as in the description
+df$num[df$num > 0] <- 1
+
+df_glm <- df
+
+# change data types 
+df <- transform(df, trestbps = as.factor(sex), cp = as.factor(cp), fbs = as.factor(fbs),
+                exang = as.factor(exang), restecg = as.factor(restecg), 
+                slope = as.factor(slope), ca = as.factor(ca), thal=as.factor(thal),
+                sex = as.factor(sex), num=as.factor(num))
+
+
+summary(df)
+
+# check the number of diseased/healthy obs
+table(df$num)
+```
+We will normalize numeric features, because they are in different scales
+```{r}
+normalize <- function(x) {
+return ((x - min(x)) / (max(x) - min(x))) }
+
+num_columns <- sapply(df, is.numeric)
+df[ , num_columns] <- lapply(df[ , num_columns], normalize)
+```
+
+KNN requires all variables besides the predictor variable to be numeric. We need to dummy code any categorical variables.
+ 
+```{r}
+# make dummies
+factor_columns <- sapply(df[-14], is.factor)
+df[ , factor_columns] <- lapply(df[ , factor_columns] , dummy.code)
+```
+ 
+
+
+Correlation matrix
+```{r}
+cor_mtx <- (cor(df_glm))
+head(cor_mtx)
+
+# heatmap
+ggplot(data = melt(cor_mtx), aes(Var2, Var1, fill = value))+
+ geom_tile(color = "black")+
+ theme(axis.text.x = element_text(angle = 90))+
+  coord_fixed()
+
+```
+
+PCA plot to check the clusters
+
+```{r}
+prc <- prcomp(x = df[-14], center=TRUE, scale=T)
+prc_adj <- data.frame(prc$x, Disease = df$num)
+ggplot(data = prc_adj, aes(x = PC1, y = PC2, color = Disease)) +
+    geom_point()
+```
+
+We are going to build knn model. We should pick an optimal value for k parameter. We could try some values, and then just choose the one which performs the best on our training data, in terms of the number of errors the algorithm would make if we apply it to the samples we have been given for training.
+
+```{r}
+# divide into train and test set
+set.seed(42)
+sample <- sample.int(n = nrow(df), size = floor(.75*nrow(df)), replace = F)
+train <- df[sample, ]
+test  <- df[-sample, ]
+```
+
+Firstly, we just try a random K and calculate the accuracy of the prediction. Accuracy is the percentage of correctly classifies instances out of all instances.
+```{r}
+
+pred_knn <- knn(train[1:13],
+                test[1:13],
+                
+                cl = train$num,
+                k = 7)
+
+tab <- table(pred_knn, real = test$num)
+print(tab)
+accuracy <- function(x){sum(diag(x)/(sum(rowSums(x))))}
+
+# the prediction accuracy
+accuracy(tab)
+
+```
+
+Then we will use caret package. In this package, the function picks the optimal number of neighbors (k).
+
+If we want to know what the best value for a tunable parameter is, we need to see how different values of the parameter perform on samples, which are not in the training data - we use cross-validation for that purpose. 
+
+CV use all the data for testing the predictive accuracy by splitting the data into a number of folds. If we have N folds, then the first step of the algorithm is to train the algorithm using (N−1) of the folds, and test the algorithm’s accuracy on the single left-out fold. This is then repeated N times until each fold has been used as in the test set.
+
+We often are underestimating the true error rate since our model has been forced to fit the test set in the best possible manner - CV solves this problem by estimating the test error rate by holding out a subset of the training set from the fitting process. 
+
+The best K is the one that corresponds to the lowest test error rate, so let’s suppose we carry out repeated measurements of the test error for different values of K.
+
+We will use the createFolds function from the caret package to make 5 folds
+
+```{r}
+trControl <- trainControl(method  = "cv",
+                          number  = 5)
+
+# caret model with 5 folds cv and 20 k checked
+knn_caret <- train(train[1:13], train$num, method = "knn", preProcess = c("center","scale"), trControl  = trControl, tuneLength = 20)
+knn_caret
+
+
+plot(knn_caret)
+```
+
+Now we will try caret model on test data. Kappa parameter is like classification accuracy, except that it is normalized at the baseline of random chance.
+
+```{r}
+knnPredict <- predict(knn_caret, newdata = test[-14] )
+#Get the confusion matrix to see accuracy value and other parameter values
+confusionMatrix(knnPredict, test$num )
+
+```
+
+We will use polynomial regression algorithm as well. We can try to model nonlinear relationships. The degree of the polynomial is tuned hyperparameter as well. 
+So we will use CV to try different degrees
+
+
+```{r}
+cv.err <- rep(0, 5)
+for (i in 1:5) {
+    gl <- glm(num ~ poly(thalach, i), data = df_glm)
+    cv.err[i] <- cv.glm(df_glm, gl)$delta[1]
+}
+cv.err
+
+plot(x=c(1:5), y=cv.err )
+```
+The best degree value is 1 (no degree.
+Let`s design the model
+```{r}
+fit3 <- glm(num ~ poly(thalach, 1), df_glm, family = 'binomial')
+summary(fit3)
+
+# prediction and confusion mtx
+prob3 <- predict(object = fit3, type = "response")
+pred3_resp  <- factor(ifelse(prob3 > 0.5, 1, 0), labels = c("0", "1"))
+confusionMatrix(pred3_resp, df[,"num"])
+```
+
+We will test our model on test data
+```{r}
+sample <- sample.int(n = nrow(df_glm), size = floor(.75*nrow(df_glm)), replace = F)
+train_glm <- df_glm[sample, ]
+test_glm <- df_glm[-sample, ]
+```
+
+```{r}
+test_prob  <- predict(fit3, newdata = test_glm, type = "response")
+test_pred_resp  <- factor(ifelse(test_prob > 0.50, 1, 0), labels = c("0", "1"))
+confusionMatrix(test_pred_resp, test[,"num"])
+
+```
+If we try degree 2 or 3, the model will have almost the same prediction power
+
+```{r}
+fit4 <- glm(num ~ poly(thalach, 4), df_glm, family = 'binomial')
+summary(fit4)
+
+# prediction and confusion mtx
+test_prob4  <- predict(fit4, newdata = test_glm, type = "response")
+test_pred_resp4  <- factor(ifelse(test_prob4 > 0.50, 1, 0), labels = c("0", "1"))
+confusionMatrix(test_pred_resp4, test[,"num"])
+```
+
+
+MSE (Mean Squared Error) represents the difference between the original and predicted values extracted by squared the average difference over the data set.
+
