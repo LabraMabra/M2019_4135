@@ -1,0 +1,81 @@
+---
+title: 'Statistics in R: Task 21'
+author: "Liuaza Etezova"
+output: pdf_document
+---
+
+```{r setup, include=F}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r packages, message=F}
+library(mlbench)
+library(dplyr)
+library(caret)
+library(e1071)
+library(boot)
+```
+
+# KNN and Logistic regression
+
+```{r data}
+data(Vehicle)
+str(Vehicle)
+```
+
+
+## KNN
+```{r boxplot}
+# area/(av.distance from border)**2
+qplot(data = Vehicle, y = D.Circ, color = Class, geom = "boxplot", main = "Distance Circularity")
+```
+
+```{r knn}
+set.seed(3)
+
+knn_model <- train(Class ~ D.Circ,
+                   method = 'knn',
+                   trControl = trainControl(method = 'cv', number = 10),
+                   tuneGrid = expand.grid(k = c(1, 2, 3, 4, 5, 6, 10, 15, 20, 25)),
+                   data = Vehicle)
+knn_model
+```
+
+```{r knn plot}
+# MSE vs different values of k
+plot(knn_model)
+```
+
+```{r knn k}
+# k with min MSE
+knn_model$bestTune
+
+# but I choose k = 4 because RMSE for k = 4 and RMSE for k = 5 are equal
+```
+
+## Logistic regression
+
+```{r refactor}
+Vehicle_2cl <- Vehicle %>%
+    filter(Class == 'bus' | Class == 'saab')
+Vehicle_2cl$Class <- factor(Vehicle_2cl$Class)
+str(Vehicle_2cl)
+```
+
+```{r glm, warning=F}
+set.seed(3)
+
+max_degree = 5
+cv.err <- rep(0, max_degree)
+for (i in 1:max_degree) {
+    gl <- glm(Class ~ poly(D.Circ, i), family = 'binomial', data = Vehicle_2cl)
+    cv.err[i] <- cv.glm(Vehicle_2cl, gl, K = 10)$delta[1]
+}
+cv.err
+```
+
+```{r glm plot}
+plot(x = 1:max_degree, y = cv.err, xlab = "Degree", ylab = "Prediction error")
+
+# degree with the smallest cross-validation estimate of prediction error is 4
+```
