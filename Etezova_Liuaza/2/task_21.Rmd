@@ -27,7 +27,7 @@ str(Vehicle)
 ## KNN
 ```{r boxplot}
 # area/(av.distance from border)**2
-qplot(data = Vehicle, y = D.Circ, color = Class, geom = "boxplot", main = "Distance Circularity")
+qplot(data = Vehicle, y = D.Circ, color = Class, geom = 'boxplot', main = "Distance Circularity")
 ```
 
 ```{r knn}
@@ -50,12 +50,12 @@ plot(knn_model)
 # k with min MSE
 knn_model$bestTune
 
-# but I choose k = 4 because RMSE for k = 4 and RMSE for k = 5 are equal
+# but I choose k = 4 because MSE for k = 4 and MSE for k = 5 are equal
 ```
 
 ## Logistic regression
 
-```{r refactor}
+```{r refactoring}
 Vehicle_2cl <- Vehicle %>%
     filter(Class == 'bus' | Class == 'saab')
 Vehicle_2cl$Class <- factor(Vehicle_2cl$Class)
@@ -75,7 +75,8 @@ cv.err
 ```
 
 ```{r glm plot}
-plot(x = 1:max_degree, y = cv.err, xlab = "Degree", ylab = "Prediction error")
+plot(x = 1:max_degree, y = cv.err, type = 'o', col = 'dodgerblue2', 
+     xlab = "Degree", ylab = "Prediction error")
 
 # degree with the smallest cross-validation estimate of prediction error is 4
 ```
