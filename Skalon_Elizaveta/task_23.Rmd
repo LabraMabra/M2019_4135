@@ -76,7 +76,7 @@ df_glm <- df
 df <- transform(df, trestbps = as.factor(sex), cp = as.factor(cp), fbs = as.factor(fbs),
                 exang = as.factor(exang), restecg = as.factor(restecg), 
                 slope = as.factor(slope), ca = as.factor(ca), thal=as.factor(thal),
-                sex = as.factor(sex), num=as.factor(num))
+                sex = as.factor(sex), num=as.factor(num), age = as.integer(age))
 
 
 summary(df)
@@ -84,13 +84,10 @@ summary(df)
 # check the number of diseased/healthy obs
 table(df$num)
 ```
-We will normalize numeric features, because they are in different scales
+We will scale numeric features, because they are in different scales
 ```{r}
-normalize <- function(x) {
-return ((x - min(x)) / (max(x) - min(x))) }
-
 num_columns <- sapply(df, is.numeric)
-df[ , num_columns] <- lapply(df[ , num_columns], normalize)
+df[ , num_columns] <- lapply(df[ , num_columns], scale)
 ```
 
 KNN requires all variables besides the predictor variable to be numeric. We need to dummy code any categorical variables.
@@ -119,7 +116,7 @@ ggplot(data = melt(cor_mtx), aes(Var2, Var1, fill = value))+
 PCA plot to check the clusters
 
 ```{r}
-prc <- prcomp(x = df[-14], center=TRUE, scale=T)
+prc <- prcomp(x = df[-14], center=TRUE, scale=F)
 prc_adj <- data.frame(prc$x, Disease = df$num)
 ggplot(data = prc_adj, aes(x = PC1, y = PC2, color = Disease)) +
     geom_point()
@@ -239,4 +236,5 @@ confusionMatrix(test_pred_resp4, test[,"num"])
 
 
 MSE (Mean Squared Error) represents the difference between the original and predicted values extracted by squared the average difference over the data set.
+
 
