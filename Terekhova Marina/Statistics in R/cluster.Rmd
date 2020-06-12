@@ -1,0 +1,278 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(mlbench)
+data(Glass)
+library(factoextra)
+library(dplyr)
+library(tidyverse)
+```
+
+## K-means
+
+```{r}
+Glass$Type2 <- as.factor(c(rep('Window', 163), rep('Non-Window', 51)))
+glass <- Glass[,-c(10,11)]
+```
+
+```{r}
+set.seed(42)
+
+wss <- function(k) {
+  kmeans(glass, k, nstart = 25)$tot.withinss
+}
+
+k.values <- 1:15
+wss_values <-map(k.values, wss)
+
+plot(k.values, wss_values,
+       type="b", pch = 19, frame = FALSE, 
+       xlab="Number of clusters K",
+       ylab="Total within-clusters sum of squares")
+abline(v = 3)
+```
+
+```{r}
+set.seed(42)
+km.res <- kmeans(glass,3, nstart = 25)
+```
+
+```{r}
+km.res
+```
+
+```{r}
+fviz_cluster(km.res, glass)
+```
+
+
+```{r}
+table(Glass$Type2, km.res$cluster)
+```
+
+```{r}
+table('Glass_Type' = Glass$Type, 'Clusters' = km.res$cluster)
+```
+
+```{r}
+Glass$K_means <- km.res$cluster
+```
+
+
+#K-means 2 and 6
+
+```{r}
+set.seed(42)
+km.res <- kmeans(glass,2, nstart = 25)
+```
+
+```{r}
+table(Glass$Type2, km.res$cluster)
+```
+
+```{r}
+fviz_cluster(km.res, glass)
+```
+
+```{r}
+set.seed(42)
+km.res <- kmeans(glass, 6, nstart = 25)
+```
+
+```{r}
+table('Glass_Type' = Glass$Type, 'Cluster' = km.res$cluster)
+```
+
+```{r}
+fviz_cluster(km.res, glass)
+```
+
+## Hierarchical clustering
+
+
+```{r}
+distance <- dist(glass , method = "euclidean")
+hc_comp <- hclust(distance, method = "complete")
+```
+```{r}
+plot(hc_comp, cex = 0.2, hang = -1)
+```
+
+```{r}
+#Al,Mg, Ba
+glass <- glass[,c(2,3,4)]
+```
+
+```{r}
+distance <- dist(glass , method = "euclidean")
+hc_comp <- hclust(distance, method = "complete")
+plot(hc_comp, cex = 0.2, hang = -1)
+```
+
+```{r}
+plot(hc_comp, cex = 0.4, hang = -1)
+rect.hclust(hc_comp, k = 3, border = 2:5)
+```
+
+```{r}
+Glass$HC <- cutree(hc_comp, 3)
+```
+
+```{r}
+table('K_means' = Glass$K_means,'HC' = Glass$HC)
+```
+
+## PCA
+
+```{r}
+apply(Glass[,1:9], 2, mean)
+```
+
+```{r}
+apply(Glass[,1:9], 2, sd)
+```
+
+```{r}
+prc <- prcomp(x = Glass[,1:9], scale = TRUE)
+prc
+```
+
+```{r}
+biplot(prc, scale = 0)
+```
+
+
+```{r}
+prc_adj <- data.frame(prc$x, Type = Glass$Type)
+ggplot(data = prc_adj, aes(x = PC1, y = PC2, color=Type)) +
+    geom_point()
+```
+
+```{r}
+prc_adj <- data.frame(prc$x, Type = Glass$Type2)
+ggplot(data = prc_adj, aes(x = PC1, y = PC2, color=Type)) +
+    geom_point()
+```
+
+#Unscaled variant
+
+
+```{r}
+prc_un <- prcomp(x = Glass[,1:9], scale = FALSE)
+```
+
+```{r}
+prc_adj_un <- data.frame(prc_un$x, Type = Glass$Type)
+ggplot(data = prc_adj_un, aes(x = PC1, y = PC2, color=Type)) +
+    geom_point()
+```
+
+```{r}
+prc_adj_un <- data.frame(prc_un$x, Type = Glass$Type2)
+ggplot(data = prc_adj_un, aes(x = PC1, y = PC2, color=Type)) +
+    geom_point()
+```
+
+# PVE 
+
+```{r}
+prc_var <- prc$sdev^2
+prc_pve <- prc_var / sum(prc_var)
+prc_pve
+```
+
+```{r}
+cumsum(prc_pve)
+```
+
+```{r}
+plot(prc_pve, type = "b", main = "Proportion of Variance Explained")
+```
+
+```{r}
+plot(cumsum(prc_pve), type = "b", main = "Cumulative Proportion of Variance Explained")
+```
+ 
+## K-means
+
+```{r}
+prc <- prc$x[,1:7]
+set.seed(42)
+
+wss <- function(k) {
+  kmeans(prc, k, nstart = 25)$tot.withinss
+}
+
+k.values <- 1:15
+wss_values <-map(k.values, wss)
+
+plot(k.values, wss_values,
+       type="b", pch = 19, frame = FALSE, 
+       xlab="Number of clusters K",
+       ylab="Total within-clusters sum of squares")
+abline(v = 3)
+```
+
+
+```{r}
+set.seed(42)
+km.res <- kmeans(prc,3, nstart = 25)
+```
+
+```{r}
+km.res
+```
+
+```{r}
+df <- as.data.frame(prc)
+df$K_means <- km.res$cluster
+ggplot(df,aes(x=PC1,y=PC2,color= as.factor(K_means))) + geom_point()
+```
+
+
+```{r}
+table('Glass_Type' = Glass$Type, 'Cluster' = km.res$cluster)
+```
+```{r}
+table('Glass_Type' = Glass$Type2, 'Cluster' = km.res$cluster)
+```
+
+
+
+## Hierarchical clustering
+
+
+```{r}
+distance <- dist(prc, method = "euclidean")
+hc_comp <- hclust(distance, method = "complete")
+```
+```{r}
+plot(hc_comp, cex = 0.2, hang = -1)
+```
+
+```{r}
+plot(hc_comp, cex = 0.4, hang = -1)
+rect.hclust(hc_comp, k = 3, border = 2:5)
+```
+
+```{r}
+df$HC <- cutree(hc_comp, 3)
+ggplot(df,aes(x=PC1,y=PC2,color= as.factor(HC))) + geom_point()
+```
+
+```{r}
+table('Glass_Type' = Glass$Type, 'Cluster' = km.res$cluster)
+```
+```{r}
+table('Glass_Type' = Glass$Type2, 'Cluster' = km.res$cluster)
+```
+```{r}
+table('K_means' = df$K_means, 'HC' =  df$HC)
+```
