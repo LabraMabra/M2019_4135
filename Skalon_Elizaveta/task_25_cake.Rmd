@@ -1,0 +1,269 @@
+---
+title: "Clustering"
+author: "Lisa Skalon"
+date: "6/12/2020"
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, error = FALSE, message = FALSE)
+```
+
+
+```{r results="hide"}
+library('ggplot2')
+library('ggpubr')
+library('dplyr')
+library('tidyr')
+library(class)
+library(psych)
+library(reshape2)
+library(boot)
+library(tidyverse)  
+library(cluster)   
+library(factoextra)
+library(cluster.datasets)
+set.seed(42)
+```
+
+We are going to analyze dataset cake.ingredients.1961 from package cluster.datasets. The dataset identifies for each cake which ingredient is used and the quantity. 
+
+```{r}
+# data cleaning
+data("cake.ingredients.1961")
+df <- cake.ingredients.1961
+str(df)
+
+df[is.na(df)] <- 0
+summary(df)
+
+row.names(df) <- df$Cake
+df <- df[,-1]
+df <- scale(df)
+df <- df[,-2]
+
+```
+
+Firstly we will try to claster the dataset with k-means method.
+
+K-means clustering is unsupervised machine learning algorithm for partitioning a given data set into a set of k groups, k is tuned hyperparameter. It classifies objects in multiple groups, such that objects within the same cluster are as similar as possible (i.e., high intra-class similarity), whereas objects from different clusters are as dissimilar as possible (i.e., low inter-class similarity). In k-means clustering, each cluster is represented by its center (i.e, centroid) which corresponds to the mean of points assigned to the cluster.
+
+
+A plot of the within groups sum of squares by number of clusters extracted can help determine the appropriate number of clusters. An “Elbow method” - a method to determine the proper number of clusters. 
+
+Increasing the number of clusters will explain more of the variation, since there are more clusters to use, but that at some point this is over-fitting, and the elbow reflects this. The idea is that the first clusters will add much information (explain a lot of variation), since the data actually consist of that many groups (so these clusters are necessary), but once the number of clusters exceeds the actual number of groups in the data, the added information will drop sharply, because it is just subdividing the actual groups.
+
+```{r}
+# Determine number of clusters
+wss <- (nrow(df)-1)*sum(apply(df,2,var))
+for (i in 2:15) wss[i] <- sum(kmeans(df,
+   centers=i, nstart = 20)$withinss)
+plot(1:15, wss, type="b", xlab="Number of Clusters",
+  ylab="Within groups sum of squares")
+```
+
+We can use build-in function as well
+
+```{r}
+fviz_nbclust(df, kmeans, method = "wss")
+
+```
+
+The algorithm starts by randomly selecting k objects from the data set to serve as the initial centers for the clusters. The selected objects are also known as cluster means or centroids. Next, each of the remaining objects is assigned to it’s closest centroid, where closest is defined using the Euclidean distance between the object and the cluster mean.
+
+totss: The total sum of squares.
+withinss: Vector of within-cluster sum of squares, one component per cluster.
+tot.withinss: Total within-cluster sum of squares, i.e. sum(withinss).
+betweenss: The between-cluster sum of squares, i.e. $totss-tot.withinss$.
+
+```{r}
+# K-Means Cluster Analysis
+k2 <- kmeans(df, 2, nstart = 20) # 2 cluster solution
+k2
+
+
+```
+
+
+```{r}
+fviz_cluster(k2, data=df)
+```
+
+```{r}
+k3 <- kmeans(df, centers = 3, nstart = 20)
+k4 <- kmeans(df, centers = 4, nstart = 20)
+k6 <- kmeans(df, centers = 6, nstart = 20)
+
+# plots to compare
+p1 <- fviz_cluster(k2, geom = "point", data = df) + ggtitle("k = 2")
+p2 <- fviz_cluster(k3, geom = "point",  data = df) + ggtitle("k = 3")
+p3 <- fviz_cluster(k4, geom = "point",  data = df) + ggtitle("k = 4")
+p4 <- fviz_cluster(k6, geom = "point",  data = df) + ggtitle("k = 6")
+
+ggarrange(p1, p2, p3, p4, nrow = 2, ncol=2)
+```
+
+Hierarchical clustering
+
+
+The key operation in hierarchical agglomerative clustering is to repeatedly combine the two nearest clusters into a larger cluster.
+
+It starts by calculating the distance between every pair of observation points and store it in a distance matrix. It then puts every point in its own cluster.
+Then it starts merging the closest pairs of points based on the distances and the amount of clusters goes down by 1. Then it recomputes the distance between the new cluster and the old ones and stores them in a new distance matrix.
+Lastly it repeats steps 2 and 3 until all the clusters are merged into one single cluster.
+
+Linkage Methods =  ways to measure the distance between clusters:
+
+Complete-linkage: calculates the maximum distance between clusters before merging.
+Single-linkage: calculates the minimum ...//...
+Average-linkage: calculates the average ...//,..
+
+
+```{r}
+distance <- dist(df)
+```
+
+
+```{r}
+hclust_avg <- hclust(distance, method = 'average')
+plot(hclust_avg)
+```
+```{r}
+hclust_comp <- hclust(distance, method = 'complete')
+plot(hclust_comp)
+```
+
+```{r}
+hclust_sng <- hclust(distance, method = 'single')
+plot(hclust_sng)
+```
+
+Next, you can cut the dendrogram in order to create the desired number of clusters with cutree function.
+
+```{r}
+hc_clusters <- cutree(hclust_avg, k = 4)
+hc_clusters
+```
+
+
+```{r}
+plot(hclust_avg)
+rect.hclust(hclust_avg , k = 9, border = 2:6)
+```
+How do hierarchical clustering results compare to k-means?
+
+```{r}
+table(k3$cluster, hc_clusters )
+
+```
+
+PCA - dimensionality reduction
+
+```{r}
+prc <- prcomp(x=df, center = T, scale = F)
+head(prc$x)
+biplot(prc, scale = 0)
+```
+
+
+```{r}
+prc_adj <- data.frame(prc$x)
+ggplot(data = prc_adj, aes(x=PC1, y=PC2, color= row.names(prc_adj)))+
+  geom_point()
+```
+
+
+Percent of variance explained by components
+
+```{r}
+prc_var <- prc$sdev^2
+prc_var
+```
+
+```{r}
+prc_pve <- prc_var/sum(prc_var)
+prc_pve
+cumsum(prc_pve)
+```
+
+```{r}
+par(mfrow=c(1,2))
+plot(prc_pve, type = 'b', main = 'PVE')
+plot(cumsum(prc_pve), type = 'b', main = 'CPVE')
+par(mfrow=c(1,1))
+```
+Variance explainet by the first few components (height = prc$sdev^2)
+```{r}
+plot(prc)
+```
+
+We can perform h-clustering on the first few (5 in our case) PC score vectors
+```{r}
+hc_prc <- hclust(dist(prc$x[,1:5]), method = "average")
+plot(hc_prc)
+rect.hclust(hc_prc, k=4)
+
+hc_pca_res <- cutree(hc_prc, 4)
+hc_pca_res
+```
+```{r}
+
+table(hc_clusters, hc_pca_res)
+
+```
+
+Results are concordant with k-means with k=4
+
+```{r}
+fviz_cluster(k4,  data = df)
+```
+
+```{r}
+data_pca_clust <- data.frame(prc$x[, 1:2],
+                             k2 = factor(cutree(hc_prc, 2)),
+                             k3 = factor(cutree(hc_prc, 3)),
+                             k4 = factor(cutree(hc_prc, 4)),
+                             k5 = factor(cutree(hc_prc, 5)))
+ggplot(data_pca_clust,  aes(x = PC1, y = PC2, color = k2, label = row.names(data_pca_clust))) + geom_point() + geom_label() + theme_bw()
+ggplot(data_pca_clust,  aes(x = PC1, y = PC2, color = k3, label = row.names(data_pca_clust))) + geom_point() + geom_label() + theme_bw()
+ggplot(data_pca_clust,  aes(x = PC1, y = PC2, color = k4, label= row.names(data_pca_clust))) + geom_point() + geom_label() + theme_bw()
+ggplot(data_pca_clust,  aes(x = PC1, y = PC2, color = k5, label = row.names(data_pca_clust))) + geom_point() + geom_label() + theme_bw()
+
+ 
+```
+We can provide h-clustering on pca results
+
+```{r}
+pca <- prc$x[,1:5]
+
+wss <- (nrow(pca)-1)*sum(apply(pca,2,var))
+for (i in 2:15) wss[i] <- sum(kmeans(pca,
+   centers=i, nstart = 20)$withinss)
+plot(1:15, wss, type="b", xlab="Number of Clusters",
+  ylab="Within groups sum of squares")
+
+```
+
+```{r}
+km_pca <- kmeans(pca, 2, nstart = 20)
+km_pca
+fviz_cluster(km_pca, data=pca)
+```
+
+
+```{r}
+table(k2$cluster, km_pca$cluster)
+
+```
+
+
+```{r}
+km_pca4 <- kmeans(pca, 4, nstart = 20)
+km_pca4
+fviz_cluster(km_pca4, data=pca)
+```
+
+
+```{r}
+table(k4$cluster, km_pca4$cluster)
+
+```
